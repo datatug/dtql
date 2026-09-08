@@ -1,6 +1,6 @@
 # Human checkpoint — reviewed implementation plan
 
-**Ready for human sign-off; implementation has not started.** The user approved A1 suggestions, then requested this implementation-plan phase with the same two-model review. Both models independently reviewed the same A2 packet and the same subsequent collection/column-mask supplement. A separate agent reconciled findings and verified the applied document corrections.
+**Historical A2/S1 checkpoint. The subsequent [A3 scoped-mask amendment](../../19-scoped-mask-stages.md) changes mask semantics and requires an updated contract review before implementation.** Implementation has not started. The user approved A1 suggestions, then requested this implementation-plan phase with the same two-model review. Both models independently reviewed the same A2 packet and the same subsequent collection/column-mask supplement. A separate agent reconciled findings and verified the applied document corrections.
 
 | Deliverable | Reviewable artifact |
 |---|---|

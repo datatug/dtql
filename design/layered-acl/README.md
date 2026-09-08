@@ -41,3 +41,5 @@ Before parallel implementation, approve C1 policy semantics/version, C2 decision
 The independent reviews must use the same packet digest and rubric without access to each other's findings. A separate reconciler classifies findings and produces the human decision report and cost/value comparison. Design approval and permission to dispatch implementation are separate; this phase stops for human sign-off.
 
 Current checkpoint: [reviewed implementation plan, both reviews and cost/value](reviews/round-2/README.md). No implementation has started.
+
+Latest user amendment: [scoped alternating mask stages](19-scoped-mask-stages.md). It changes the flat-mask contract after review; the new revision requires schema/plan updates and delta review before freeze or implementation.
