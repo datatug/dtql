@@ -1,0 +1,33 @@
+{
+  "apiVersion": "dtql.org/authorization/v1",
+  "mode": "inspect",
+  "diagnosticLevel": "ordinary",
+  "operations": [
+    {
+      "id": "u1",
+      "action": "update",
+      "resource": {
+        "databaseId": "crm",
+        "path": "/customers/101",
+        "rowId": "101",
+        "columns": [
+          [
+            "name"
+          ]
+        ]
+      },
+      "mutation": {
+        "changes": [
+          {
+            "op": "set",
+            "path": [
+              "name"
+            ],
+            "value": "Ada Updated"
+          }
+        ]
+      },
+      "executionClass": "dtql"
+    }
+  ]
+}

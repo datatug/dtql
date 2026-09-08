@@ -1,6 +1,6 @@
 # Decision log and human checkpoint
 
-All architecture recommendations remain proposed unless explicitly directed by the user below. No implementation sign-off has been received.
+The user approved all reconciled recommendations and H1–H7 on 2026-09-08 and requested the implementation plan with the same two-model review. This approves design finalization, not MVP implementation dispatch. The status column below records the original A1 checkpoint; its pending decisions are superseded by that approval and the [A2 closure ledger](17-approval-closure.md).
 
 | ID | Decision / recommendation | Alternatives and rationale | Status |
 |---|---|---|---|

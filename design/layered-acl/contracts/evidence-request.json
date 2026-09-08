@@ -1,0 +1,16 @@
+{
+  "apiVersion": "dtql.org/authorization/v1",
+  "resource": {
+    "databaseId": "crm",
+    "path": "/customers/101",
+    "rowId": "101"
+  },
+  "requiredFields": [
+    [
+      "name"
+    ],
+    [
+      "middle_name"
+    ]
+  ]
+}

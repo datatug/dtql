@@ -1,0 +1,75 @@
+{
+  "role": "Opus independent A2 reviewer",
+  "requestedModel": "opus",
+  "reasoningEffort": "high",
+  "packetSHA256": "245ecd60af3902dee4404b2f8e5c7969d8380ea37683a31c6124bbdfec92515a",
+  "startedAt": "2026-09-08T14:59:26.256697+00:00",
+  "exitCode": 0,
+  "elapsedSeconds": 357.859,
+  "finishedAt": "2026-09-08T15:05:24.116112+00:00",
+  "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 105508,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 25029,
+    "output_tokens_details": {
+      "thinking_tokens": 17228
+    },
+    "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+      "ephemeral_1h_input_tokens": 105508,
+      "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "not_available",
+    "iterations": [
+      {
+        "input_tokens": 2,
+        "output_tokens": 25029,
+        "cache_read_input_tokens": 0,
+        "cache_creation_input_tokens": 105508,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 105508
+        },
+        "type": "message"
+      }
+    ],
+    "speed": "standard"
+  },
+  "modelUsage": {
+    "claude-haiku-4-5-20251001": {
+      "inputTokens": 77144,
+      "outputTokens": 18,
+      "cacheReadInputTokens": 0,
+      "cacheCreationInputTokens": 0,
+      "webSearchRequests": 0,
+      "costUSD": 0.07723400000000001,
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000,
+      "thinkingTokens": 0,
+      "canonicalModel": "claude-haiku-4-5",
+      "provider": "firstParty",
+      "costBasis": "list"
+    },
+    "claude-opus-5": {
+      "inputTokens": 2,
+      "outputTokens": 25029,
+      "cacheReadInputTokens": 0,
+      "cacheCreationInputTokens": 105508,
+      "webSearchRequests": 0,
+      "costUSD": 1.680815,
+      "contextWindow": 1000000,
+      "maxOutputTokens": 64000,
+      "thinkingTokens": 17228,
+      "canonicalModel": "claude-opus-5",
+      "provider": "firstParty",
+      "costBasis": "list"
+    }
+  },
+  "reportedCostUSD": 1.758049,
+  "isError": false
+}

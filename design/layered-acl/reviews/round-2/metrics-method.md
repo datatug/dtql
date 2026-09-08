@@ -1,0 +1,7 @@
+# Round-two measurement method
+
+Both reviewers receive identical A2 input (SHA256 in manifest). Astra reads the frozen file through tools; Opus receives it on stdin with tools disabled. Different harness prompting/cache/tool overhead means cumulative token counts are not a controlled speed or reasoning-efficiency benchmark. Context rereads count again as cached input where reported. Output totals include exposed reasoning tokens; do not add reasoning twice.
+
+Record exact executed model, start/end, elapsed, input/cache/output/total from harness telemetry. Opus total_cost_usd is tooling-reported list/API cost, not an actual subscription invoice; ancillary model usage is reported separately. Codex reviewer/reconciler monetary cost is unavailable unless tooling exposes it; unknown is never zero. Report accepted root findings, unique accepted, accepted high/critical, Jaccard and smaller-review coverage overlap after reconciliation. Cost per finding is undefined for missing cost or zero denominator.
+
+A1 and A2 review different revisions/tasks. Do not sum a repeated regression finding across rounds as two independent architectural discoveries. Compare models within a round and report cross-round totals as workflow expenditure only. The separate reconciler's recommendations determine provisional acceptance until human confirmation. A focused correction verification is charged separately when telemetry permits and does not retroactively change either sealed independent review.

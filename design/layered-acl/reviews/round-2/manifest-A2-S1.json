@@ -1,0 +1,6 @@
+{
+  "sha256": "1dc80f6ab3a7d7c40298d3d7af383cbdc3aad21a5020b2fae8af70b8f9a1244c",
+  "supplement": "../../18-mask-supplement.md",
+  "source": "dal-go/dalgo/access/fields.go:1-240",
+  "sourceRevision": "6b0be09b95bd3afc90309763671791e17264dffe"
+}

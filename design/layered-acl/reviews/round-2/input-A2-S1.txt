@@ -1,0 +1,311 @@
+A2-S1 identical supplemental review input. Review this delta against your sealed main A2 review; do not read any peer review. Return <=1200 words with new AS-/OS- finding IDs and readiness. No implementation or file edits.
+
+# A2-S1 — collection and column inclusion/exclusion masks
+
+User direction after the A2 main packet froze: inclusion/exclusion patterns also apply to collections and columns. Both independent reviewers receive this identical supplement after sealing their main review; it is reviewed before reconciliation. This extends C1/C2/C7 and the package/test plan, not native execution scope. Native SQL/GraphQL/procedure effects remain unsupported.
+
+## Reuse verified against existing DALgo
+
+At audited DALgo commit `6b0be09b95bd3afc90309763671791e17264dffe`, `access/fields.go` already parses per-segment literal, `*`, prefix* and *suffix masks, supports dotted paths/parent descendants, and intersects `fieldSets`. It has no exclusion set. Extend that same parsed representation with exclusions and reuse its segment matcher; preserve legacy `fields` behavior. Do not expand masks into a schema snapshot or add a competing evaluator.
+
+All new name masks (procedure base names, collections, individual column segments) use the same bounded existing segment grammar: literal, exactly `*`, one trailing `*` or one leading `*`; reject interior/multiple stars, `?`, regex, escapes, control characters and separators. Matching is anchored/case-sensitive after source canonicalization. This **tightens** A2's more permissive procedure-star wording before freeze; User_* and sys_* are unchanged. Maximum 32 include and 32 exclude patterns, each ≤128 UTF-8 bytes. Include must be nonempty; exclude may be omitted/empty. Defaults are never inferred from exclude alone: use explicit include:["*"]. A separate ordinary deny can deny all; no ambiguous empty include meaning unrestricted.
+
+## Collection mask
+
+Add optional `collectionMask:{include:[nameMask,...],exclude?:[nameMask,...]}` to AccessPolicy. It is a **mandatory conjunctive admission gate**, like execution, not a wildcard path with invented specificity. It applies to every data operation assessed by that policy, irrespective of which bound rule allows it. Omission adds no collection gate. When present, the normalized owner collection must match an inclusion and no exclusion. Exclusion wins inside the gate. No match is `ACL_COLLECTION_DENIED` with table scope; another independent policy or owner cannot override it.
+
+MVP targets single root collections. Match canonical collection base name resolved from the parsed query/key, not caller display aliases; preserve the owner's database identity. Existing `path`/rule hierarchy still decides ordinary operations, row/field restrictions and bindings. The collection gate cannot grant an ordinary action that the policy denies. Nested/collection-group/native requests whose touched collections cannot be fully resolved are unsupported under this profile, never treated as matching `*`.
+
+Example complete narrowing policy (applicable to all authenticated subjects already admitted by other mandatory policies):
+
+```yaml
+apiVersion: dtql.org/access/v1
+kind: AccessPolicy
+metadata:
+  name: public-customer-surface
+  visibility: public
+target:
+  database: crm
+composition: dalgo-hierarchical-v1
+default: deny
+collectionMask:
+  include: ["*"]
+  exclude: ["sys_*"]
+execution:
+  allow:
+    - class: dtql
+scopes:
+  - path: /
+    rules:
+      - id: surface
+        effect: allow
+        operations: [get, exists, query, insert, set, update, delete]
+        fieldMask:
+          include: ["*"]
+          exclude: ["secret_*", "address.internal_*"]
+```
+
+This narrows access to non-sys_ root collections and permitted columns. It does not replace the required tenant/country/workflow policies or grant the actions they deny. For only User_* collections, use collectionMask include:["User_*"]. Schema discovery applies this gate before collection enumeration/pagination. Public policy text intentionally discloses its mask literals subject to ordinary policy read authority.
+
+## Column mask
+
+Add optional `fieldMask:{include:[fieldPattern,...],exclude?:[fieldPattern,...]}` to an **allow** rule, mutually exclusive with legacy-compatible `fields`. Deny rules forbid both. `fields:[...]` retains exact existing semantics and is not silently reserialized as fieldMask. A fieldMask parses to one internal fieldSet containing inclusion and exclusion patterns. `allows(path) = any(include matches path) AND NOT any(exclude matches path)`. Excluded parent paths exclude every descendant; including a parent covers descendants subject to exclusions. A literal dotted field pattern always means nested segments, never a literal dot in a physical key. Reject ambiguous physical keys at protected normalization/evidence boundaries as specified in C1.
+
+Column patterns reuse current DALgo dotted segment grammar and parent/subtree semantics: `address.*` selects descendants and current parent-prefix behavior; `address.internal_*` excludes matching nested fields and their descendants. The implementation must not return an object wholesale just because its parent is included: recursively redact excluded descendants. Setting/replacing a parent validates every affected descendant, including removed fields; an excluded child blocks whole-object replacement even if its value is unchanged when the operation touches it. Arrays and complex provider paths are unsupported unless existing conformance proves complete affected-path handling.
+
+Apply masks to explicit projections, filter/sort references, evidence coverage, schema visibility and actual write field paths. Query allow alternatives retain DALgo's conservative **intersection**, now intersecting each include-minus-exclude set; point/write decisions retain the first deciding rule. No union of different policies' includes can defeat another's exclusion. For wildcard reads recurse/project safely before emitting data. A new column matching include:["*"] is allowed unless excluded; explicit legacy field lists continue to deny unlisted new fields. The UI must show this difference instead of promising that every future column defaults denied.
+
+C2 adds restriction kind `field_mask`, representation `mask`, with required mask:{include,exclude?} and no expression/fields/omissionReason. A private or oversized mask becomes a coalesced reference, with kind field_mask or opaque, following the same privacy rules. Existing field_allowlist/fields variant remains. Collection gates are static operation decisions/blockers; no residual mask is needed for the single resolved collection. Return `ACL_COLUMN_DENIED` for excluded columns, not a second column taxonomy. Column names in diagnostics still require safe request/evidence disclosure.
+
+## Implementation and acceptance delta
+
+WP1 adds schema/round-trip/golden and negative fixtures for collectionMask/fieldMask, mask restriction variant and ACL_COLLECTION_DENIED. WP2a extends the existing pattern parser/fieldSet and document AST; WP2b evaluates mandatory collection gates. WP3a/b applies exclusion-aware `allows` everywhere, including enumerable projection fast paths, recursive redaction, query references and affected-path validation. Do not use old enumerable optimization if it would bypass exclusions; conservative fallback stays bounded and enforces before result publication. WP4/5 schema discovery applies gates; WP7 forms preserve include/exclude sets and warn about future-field wildcard inclusion. WP8 tests actual protected queries and updates, not mask serialization alone.
+
+T21 (mandatory): (a) sys_a collection excluded while User_a included; direct lower owner enforces despite upper allow; (b) include * exclude secret_* read omits secret_token, explicit selection/filter/sort reject, UPDATE secret_token denied; (c) include address.* exclude address.internal_* recursively hides/denies internal_code and prevents parent replacement/removal bypass; (d) add a new public field and new secret_ field, verify wildcard behavior after schema reload; (e) multiple matched policies/alternatives cannot union away an exclusion; (f) canonical edit→owner persist→restart→Explain→real query→UPDATE keeps both mask sets; (g) private mask details/count remain hidden, and unsupported nested collection/array operations fail closed. Existing T01–T20/V01–V08 remain required.
+
+C7 review must assess these masks in the same current policy engine and reject unsafe enumerable/subtree shortcuts. No query-text matching, arbitrary SQL effects parser or standalone mask service is introduced.
+
+## Shared exact DALgo fields.go source evidence, audited SHA in supplement
+
+```go
+1: package access
+2: 
+3: import (
+4: 	"context"
+5: 	"encoding/json"
+6: 	"fmt"
+7: 	"reflect"
+8: 	"sort"
+9: 	"strings"
+10: 
+11: 	"github.com/dal-go/dalgo/condeval"
+12: 	"github.com/dal-go/dalgo/dal"
+13: 	"github.com/dal-go/record"
+14: 	"github.com/dal-go/record/update"
+15: )
+16: 
+17: // fieldPattern is one parsed entry of a rule's fields allow-list: dotted
+18: // segments, each a literal, a lone "*" (any one segment) or a glob with one
+19: // "*" at the start or end ("public_*", "*_id"); a trailing ".*" matches the
+20: // whole subtree below the preceding path.
+21: type fieldPattern struct {
+22: 	source   string
+23: 	segments []string
+24: 	subtree  bool
+25: }
+26: 
+27: // fieldSet is a rule's allow-list. A nil *fieldSet means every field.
+28: type fieldSet struct {
+29: 	patterns []fieldPattern
+30: 	sources  []string
+31: }
+32: 
+33: func parseFieldPatterns(sources []string) (*fieldSet, error) {
+34: 	if len(sources) == 0 {
+35: 		return nil, fmt.Errorf("access: a fields list must name at least one pattern")
+36: 	}
+37: 	set := &fieldSet{}
+38: 	for _, source := range sources {
+39: 		text := strings.TrimSpace(source)
+40: 		if text == "" {
+41: 			return nil, fmt.Errorf("access: fields contains an empty pattern")
+42: 		}
+43: 		pattern := fieldPattern{source: text}
+44: 		if strings.HasSuffix(text, ".*") {
+45: 			pattern.subtree = true
+46: 			text = strings.TrimSuffix(text, ".*")
+47: 		}
+48: 		for _, segment := range strings.Split(text, ".") {
+49: 			if segment == "" {
+50: 				return nil, fmt.Errorf("access: fields pattern %q has an empty segment", source)
+51: 			}
+52: 			if stars := strings.Count(segment, "*"); stars > 1 || (stars == 1 && segment != "*" && !strings.HasPrefix(segment, "*") && !strings.HasSuffix(segment, "*")) {
+53: 				return nil, fmt.Errorf("access: fields pattern %q: a segment may be *, a prefix* or a *suffix", source)
+54: 			}
+55: 			pattern.segments = append(pattern.segments, segment)
+56: 		}
+57: 		set.patterns = append(set.patterns, pattern)
+58: 		set.sources = append(set.sources, pattern.source)
+59: 	}
+60: 	return set, nil
+61: }
+62: 
+63: func segmentMatches(pattern, segment string) bool {
+64: 	switch {
+65: 	case pattern == "*":
+66: 		return true
+67: 	case strings.HasPrefix(pattern, "*"):
+68: 		return strings.HasSuffix(segment, pattern[1:])
+69: 	case strings.HasSuffix(pattern, "*"):
+70: 		return strings.HasPrefix(segment, pattern[:len(pattern)-1])
+71: 	default:
+72: 		return pattern == segment
+73: 	}
+74: }
+75: 
+76: // allows reports whether a dotted field path is readable or writable under
+77: // the set: a pattern matches the path exactly, matches a prefix of it (an
+78: // allowed parent covers its children), or is a subtree pattern over a prefix.
+79: func (s *fieldSet) allows(path string) bool {
+80: 	if s == nil {
+81: 		return true
+82: 	}
+83: 	segments := strings.Split(path, ".")
+84: 	for _, pattern := range s.patterns {
+85: 		if len(pattern.segments) > len(segments) {
+86: 			continue
+87: 		}
+88: 		matched := true
+89: 		for i, want := range pattern.segments {
+90: 			if !segmentMatches(want, segments[i]) {
+91: 				matched = false
+92: 				break
+93: 			}
+94: 		}
+95: 		if matched {
+96: 			return true
+97: 		}
+98: 	}
+99: 	return false
+100: }
+101: 
+102: // enumerable reports the top-level field names the set can be projected to
+103: // when no pattern uses a wildcard in its first segment; otherwise ok is false
+104: // and callers must fall back to redaction.
+105: func (s *fieldSet) enumerable() (names []string, ok bool) {
+106: 	if s == nil {
+107: 		return nil, false
+108: 	}
+109: 	seen := map[string]struct{}{}
+110: 	for _, pattern := range s.patterns {
+111: 		first := pattern.segments[0]
+112: 		if strings.Contains(first, "*") {
+113: 			return nil, false
+114: 		}
+115: 		seen[first] = struct{}{}
+116: 	}
+117: 	names = make([]string, 0, len(seen))
+118: 	for name := range seen {
+119: 		names = append(names, name)
+120: 	}
+121: 	sort.Strings(names)
+122: 	return names, true
+123: }
+124: 
+125: // fieldSets is the intersection of the allow-lists every applicable policy
+126: // imposes on one resource; a field is allowed only when every set allows it.
+127: type fieldSets []*fieldSet
+128: 
+129: func (sets fieldSets) allows(path string) bool {
+130: 	for _, set := range sets {
+131: 		if !set.allows(path) {
+132: 			return false
+133: 		}
+134: 	}
+135: 	return true
+136: }
+137: 
+138: func (sets fieldSets) restrictive() bool {
+139: 	for _, set := range sets {
+140: 		if set != nil {
+141: 			return true
+142: 		}
+143: 	}
+144: 	return false
+145: }
+146: 
+147: func (sets fieldSets) sources() string {
+148: 	var all []string
+149: 	for _, set := range sets {
+150: 		if set != nil {
+151: 			all = append(all, "["+strings.Join(set.sources, ", ")+"]")
+152: 		}
+153: 	}
+154: 	return strings.Join(all, " ∩ ")
+155: }
+156: 
+157: // enumerable intersects the projectable top-level names of every set; ok is
+158: // false when any restrictive set cannot be enumerated.
+159: func (sets fieldSets) enumerable() ([]string, bool) {
+160: 	var names []string
+161: 	first := true
+162: 	for _, set := range sets {
+163: 		if set == nil {
+164: 			continue
+165: 		}
+166: 		own, ok := set.enumerable()
+167: 		if !ok {
+168: 			return nil, false
+169: 		}
+170: 		if first {
+171: 			names, first = own, false
+172: 			continue
+173: 		}
+174: 		keep := names[:0]
+175: 		for _, name := range names {
+176: 			for _, candidate := range own {
+177: 				if name == candidate {
+178: 					keep = append(keep, name)
+179: 					break
+180: 				}
+181: 			}
+182: 		}
+183: 		names = keep
+184: 	}
+185: 	return names, !first
+186: }
+187: 
+188: // disallowedPaths lists the leaf paths of JSON-shaped data the sets refuse.
+189: func (sets fieldSets) disallowedPaths(data map[string]any) []string {
+190: 	var refused []string
+191: 	var walk func(prefix string, value any)
+192: 	walk = func(prefix string, value any) {
+193: 		if nested, ok := value.(map[string]any); ok && len(nested) > 0 {
+194: 			for key, child := range nested {
+195: 				path := key
+196: 				if prefix != "" {
+197: 					path = prefix + "." + key
+198: 				}
+199: 				walk(path, child)
+200: 			}
+201: 			return
+202: 		}
+203: 		if !sets.allows(prefix) {
+204: 			refused = append(refused, prefix)
+205: 		}
+206: 	}
+207: 	for key, value := range data {
+208: 		walk(key, value)
+209: 	}
+210: 	sort.Strings(refused)
+211: 	return refused
+212: }
+213: 
+214: // disallowedUpdates lists the update paths the sets refuse.
+215: func (sets fieldSets) disallowedUpdates(updates []update.Update) []string {
+216: 	var refused []string
+217: 	for _, item := range updates {
+218: 		path := item.FieldName()
+219: 		if fieldPath := item.FieldPath(); len(fieldPath) > 0 {
+220: 			path = strings.Join(fieldPath, ".")
+221: 		}
+222: 		if !sets.allows(path) {
+223: 			refused = append(refused, path)
+224: 		}
+225: 	}
+226: 	sort.Strings(refused)
+227: 	return refused
+228: }
+229: 
+230: // redactMap removes every leaf the sets refuse, in place.
+231: func (sets fieldSets) redactMap(prefix string, data map[string]any) {
+232: 	for key, value := range data {
+233: 		path := key
+234: 		if prefix != "" {
+235: 			path = prefix + "." + key
+236: 		}
+237: 		if nested, ok := value.(map[string]any); ok && len(nested) > 0 {
+238: 			sets.redactMap(path, nested)
+239: 			if len(nested) == 0 {
+240: 				delete(data, key)
+```

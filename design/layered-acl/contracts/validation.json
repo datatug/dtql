@@ -1,0 +1,102 @@
+{
+  "schemaValid": true,
+  "structuralFixtures": [
+    {
+      "file": "policy.json",
+      "expectedValid": true,
+      "matched": true
+    },
+    {
+      "file": "inspect-request.json",
+      "expectedValid": true,
+      "matched": true
+    },
+    {
+      "file": "inspect-result.json",
+      "expectedValid": true,
+      "matched": true
+    },
+    {
+      "file": "sample-result.json",
+      "expectedValid": true,
+      "matched": true
+    },
+    {
+      "file": "opaque-plan-result.json",
+      "expectedValid": true,
+      "matched": true
+    },
+    {
+      "file": "evidence-request.json",
+      "expectedValid": true,
+      "matched": true
+    },
+    {
+      "file": "evidence-response.json",
+      "expectedValid": true,
+      "matched": true
+    },
+    {
+      "file": "invalid-sample-allow.json",
+      "expectedValid": false,
+      "matched": true
+    },
+    {
+      "file": "invalid-reference-expression.json",
+      "expectedValid": false,
+      "matched": true
+    },
+    {
+      "file": "sample-selection-route-denied.json",
+      "expectedValid": true,
+      "matched": true
+    },
+    {
+      "file": "sample-selection-field-denied.json",
+      "expectedValid": true,
+      "matched": true
+    },
+    {
+      "file": "sample-selection-unavailable.json",
+      "expectedValid": true,
+      "matched": true
+    },
+    {
+      "file": "sample-empty.json",
+      "expectedValid": true,
+      "matched": true
+    },
+    {
+      "file": "sample-template-collision-avoided.json",
+      "expectedValid": true,
+      "matched": true
+    },
+    {
+      "file": "sample-request-s1.json",
+      "expectedValid": true,
+      "matched": true
+    },
+    {
+      "file": "mask-policy.json",
+      "expectedValid": true,
+      "matched": true
+    },
+    {
+      "file": "invalid-fields-and-mask.json",
+      "expectedValid": false,
+      "matched": true
+    },
+    {
+      "file": "invalid-interior-mask.json",
+      "expectedValid": false,
+      "matched": true
+    },
+    {
+      "file": "mask-restriction-result.json",
+      "expectedValid": true,
+      "matched": true
+    }
+  ],
+  "yamlSemanticEquality": true,
+  "runtimeACLTests": "not implemented; specification artifacts only"
+}

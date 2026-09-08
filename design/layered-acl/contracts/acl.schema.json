@@ -1,0 +1,2622 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dtql:acl:a2",
+  "title": "DTQL layered ACL final reviewed specification shapes",
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "string": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "scalar": {
+      "type": [
+        "string",
+        "boolean",
+        "number",
+        "null"
+      ]
+    },
+    "json": {},
+    "field": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      },
+      "minItems": 1,
+      "maxItems": 16
+    },
+    "condition": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "and": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/condition"
+              },
+              "minItems": 1
+            }
+          },
+          "required": [
+            "and"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "or": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/condition"
+              },
+              "minItems": 1
+            }
+          },
+          "required": [
+            "or"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "enum": [
+                "==",
+                ">",
+                ">=",
+                "<",
+                "<="
+              ]
+            },
+            "left": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                }
+              },
+              "required": [
+                "field"
+              ],
+              "additionalProperties": false
+            },
+            "right": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "value": {
+                      "$ref": "#/$defs/scalar"
+                    }
+                  },
+                  "required": [
+                    "value"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "param": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 256
+                    }
+                  },
+                  "required": [
+                    "param"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            }
+          },
+          "required": [
+            "op",
+            "left",
+            "right"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "In"
+            },
+            "left": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                }
+              },
+              "required": [
+                "field"
+              ],
+              "additionalProperties": false
+            },
+            "right": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "values": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/$defs/scalar"
+                      },
+                      "minItems": 1
+                    }
+                  },
+                  "required": [
+                    "values"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "param": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 256
+                    }
+                  },
+                  "required": [
+                    "param"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            }
+          },
+          "required": [
+            "op",
+            "left",
+            "right"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "principal": {
+      "type": "object",
+      "properties": {
+        "realm": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "kind": {
+          "enum": [
+            "user",
+            "service",
+            "application",
+            "agent"
+          ]
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "required": [
+        "realm",
+        "kind",
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "resource": {
+      "type": "object",
+      "properties": {
+        "databaseId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "table": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "rowId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "columns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/field"
+          },
+          "minItems": 0,
+          "maxItems": 32,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "databaseId",
+        "path"
+      ],
+      "additionalProperties": false
+    },
+    "action": {
+      "enum": [
+        "get",
+        "exists",
+        "query",
+        "insert",
+        "set",
+        "update",
+        "delete",
+        "truncate"
+      ]
+    },
+    "rule": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "effect": {
+          "enum": [
+            "allow",
+            "deny"
+          ]
+        },
+        "operations": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "get",
+              "exists",
+              "query",
+              "insert",
+              "set",
+              "update",
+              "delete",
+              "truncate",
+              "read",
+              "write",
+              "readwrite"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 11,
+          "uniqueItems": true
+        },
+        "where": {
+          "$ref": "#/$defs/condition"
+        },
+        "check": {
+          "$ref": "#/$defs/condition"
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true
+        },
+        "fieldMask": {
+          "$ref": "#/$defs/fieldMask"
+        }
+      },
+      "required": [
+        "id",
+        "effect",
+        "operations"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "effect": {
+                "const": "deny"
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "where"
+                  ]
+                },
+                {
+                  "required": [
+                    "check"
+                  ]
+                },
+                {
+                  "required": [
+                    "fields"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "fields",
+              "fieldMask"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "effect": {
+                "const": "deny"
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "required": [
+                "fieldMask"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "scope": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "collectionGroup": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "opaqueQuery": {
+          "const": true
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/rule"
+          },
+          "minItems": 1,
+          "maxItems": 1000
+        },
+        "scopes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/scope"
+          },
+          "minItems": 1
+        }
+      },
+      "required": [],
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "required": [
+            "path"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "collectionGroup"
+                ]
+              },
+              {
+                "required": [
+                  "opaqueQuery"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "required": [
+            "collectionGroup"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "path"
+                ]
+              },
+              {
+                "required": [
+                  "opaqueQuery"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "required": [
+            "opaqueQuery"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "path"
+                ]
+              },
+              {
+                "required": [
+                  "collectionGroup"
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "anyOf": [
+        {
+          "required": [
+            "rules"
+          ]
+        },
+        {
+          "required": [
+            "scopes"
+          ]
+        }
+      ]
+    },
+    "bindings": {
+      "type": "object",
+      "properties": {
+        "users": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/id"
+            },
+            "minItems": 1,
+            "maxItems": 1000,
+            "uniqueItems": true
+          },
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "roles": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/id"
+            },
+            "minItems": 1,
+            "maxItems": 1000,
+            "uniqueItems": true
+          },
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "groups": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/id"
+            },
+            "minItems": 1,
+            "maxItems": 1000,
+            "uniqueItems": true
+          },
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "everyone": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "minItems": 1,
+          "maxItems": 1000,
+          "uniqueItems": true
+        }
+      },
+      "required": [],
+      "additionalProperties": false,
+      "minProperties": 1
+    },
+    "policy": {
+      "type": "object",
+      "properties": {
+        "apiVersion": {
+          "const": "dtql.org/access/v1"
+        },
+        "kind": {
+          "const": "AccessPolicy"
+        },
+        "metadata": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "$ref": "#/$defs/id"
+            },
+            "description": {
+              "type": "string",
+              "maxLength": 2048
+            },
+            "visibility": {
+              "enum": [
+                "public",
+                "private"
+              ]
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "additionalProperties": false
+        },
+        "target": {
+          "type": "object",
+          "properties": {
+            "database": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          },
+          "required": [
+            "database"
+          ],
+          "additionalProperties": false
+        },
+        "composition": {
+          "const": "dalgo-hierarchical-v1"
+        },
+        "default": {
+          "const": "deny"
+        },
+        "scopes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/scope"
+          },
+          "minItems": 1
+        },
+        "ruleSets": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {
+            "$ref": "#/$defs/id"
+          },
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/scope"
+            },
+            "minItems": 1
+          }
+        },
+        "bindings": {
+          "$ref": "#/$defs/bindings"
+        },
+        "execution": {
+          "$ref": "#/$defs/executionGate"
+        },
+        "collectionMask": {
+          "$ref": "#/$defs/collectionMask"
+        }
+      },
+      "required": [
+        "apiVersion",
+        "kind",
+        "metadata",
+        "target",
+        "composition",
+        "default"
+      ],
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "required": [
+            "scopes"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "ruleSets"
+                ]
+              },
+              {
+                "required": [
+                  "bindings"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "required": [
+            "ruleSets",
+            "bindings"
+          ],
+          "not": {
+            "required": [
+              "scopes"
+            ]
+          }
+        }
+      ]
+    },
+    "query": {
+      "type": "object",
+      "properties": {
+        "format": {
+          "const": "dtql-yaml"
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1048576
+        },
+        "parameters": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/scalar"
+          }
+        }
+      },
+      "required": [
+        "format",
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "change": {
+      "type": "object",
+      "properties": {
+        "op": {
+          "const": "set"
+        },
+        "path": {
+          "$ref": "#/$defs/field"
+        },
+        "value": {
+          "$ref": "#/$defs/json"
+        }
+      },
+      "required": [
+        "op",
+        "path",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "mutation": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "data": {
+              "type": "object"
+            },
+            "ifDataRevision": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          },
+          "required": [
+            "data"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "changes": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/change"
+              },
+              "minItems": 1,
+              "maxItems": 32
+            },
+            "ifDataRevision": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          },
+          "required": [
+            "changes"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "ifDataRevision": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "operation": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "action": {
+          "$ref": "#/$defs/action"
+        },
+        "resource": {
+          "$ref": "#/$defs/resource"
+        },
+        "query": {
+          "$ref": "#/$defs/query"
+        },
+        "mutation": {
+          "$ref": "#/$defs/mutation"
+        },
+        "executionClass": {
+          "$ref": "#/$defs/executionClass"
+        },
+        "callable": {
+          "$ref": "#/$defs/callable"
+        }
+      },
+      "required": [
+        "id",
+        "action",
+        "resource",
+        "executionClass"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "executionClass": {
+                "const": "stored_procedure"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "callable"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "callable"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "request": {
+      "type": "object",
+      "properties": {
+        "apiVersion": {
+          "const": "dtql.org/authorization/v1"
+        },
+        "mode": {
+          "enum": [
+            "plan",
+            "inspect",
+            "sample"
+          ]
+        },
+        "sample": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "$ref": "#/$defs/query"
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          "required": [
+            "query",
+            "limit"
+          ],
+          "additionalProperties": false
+        },
+        "subject": {
+          "$ref": "#/$defs/principal"
+        },
+        "simulation": {
+          "type": "object",
+          "properties": {
+            "roles": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "minItems": 0,
+              "maxItems": 1000,
+              "uniqueItems": true
+            },
+            "groups": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "minItems": 0,
+              "maxItems": 1000,
+              "uniqueItems": true
+            },
+            "attributes": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/$defs/scalar"
+              }
+            }
+          },
+          "required": [
+            "roles",
+            "groups",
+            "attributes"
+          ],
+          "additionalProperties": false
+        },
+        "operations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/operation"
+          },
+          "minItems": 1,
+          "maxItems": 100
+        },
+        "diagnosticLevel": {
+          "enum": [
+            "ordinary",
+            "references",
+            "policy"
+          ]
+        }
+      },
+      "required": [
+        "apiVersion",
+        "mode",
+        "operations",
+        "diagnosticLevel"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "sample"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "sample"
+            ],
+            "properties": {
+              "operations": {
+                "maxItems": 1
+              }
+            }
+          },
+          "else": {
+            "not": {
+              "required": [
+                "sample"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "policyRef": {
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "databaseId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "policyId": {
+          "$ref": "#/$defs/id"
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "ruleId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "required": [
+        "ownerId",
+        "databaseId",
+        "policyId",
+        "revision"
+      ],
+      "additionalProperties": false
+    },
+    "source": {
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "provider": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "databaseId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "kind": {
+          "enum": [
+            "datatug",
+            "openvaultdb",
+            "ingitdb",
+            "application",
+            "adapter"
+          ]
+        },
+        "reference": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "required": [
+        "ownerId",
+        "provider",
+        "databaseId",
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "outcome": {
+      "enum": [
+        "allow",
+        "conditional",
+        "deny",
+        "indeterminate"
+      ]
+    },
+    "scopeName": {
+      "enum": [
+        "database",
+        "table",
+        "row",
+        "column",
+        "operation",
+        "principal",
+        "configuration"
+      ]
+    },
+    "capabilities": {
+      "type": "object",
+      "properties": {
+        "discover": {
+          "type": "boolean"
+        },
+        "list": {
+          "type": "boolean"
+        },
+        "read": {
+          "type": "boolean"
+        },
+        "create": {
+          "type": "boolean"
+        },
+        "update": {
+          "type": "boolean"
+        },
+        "delete": {
+          "type": "boolean"
+        },
+        "explain": {
+          "type": "boolean"
+        },
+        "simulate": {
+          "type": "boolean"
+        },
+        "diagnostics": {
+          "type": "boolean"
+        },
+        "policyAdmin": {
+          "type": "boolean"
+        },
+        "inspectProtected": {
+          "type": "boolean"
+        },
+        "schemaRead": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "discover",
+        "list",
+        "read",
+        "create",
+        "update",
+        "delete",
+        "explain",
+        "simulate",
+        "diagnostics",
+        "policyAdmin",
+        "inspectProtected",
+        "schemaRead"
+      ],
+      "additionalProperties": false
+    },
+    "limits": {
+      "type": "object",
+      "properties": {
+        "queryRows": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "queryOffset": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "bufferBytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "executionMilliseconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "dryRunMilliseconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "sampleRows": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "operations": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "columns": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "responseBytes": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "queryRows",
+        "queryOffset",
+        "bufferBytes",
+        "executionMilliseconds",
+        "dryRunMilliseconds",
+        "sampleRows",
+        "operations",
+        "columns",
+        "responseBytes"
+      ],
+      "additionalProperties": false
+    },
+    "descriptor": {
+      "type": "object",
+      "properties": {
+        "layerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "source": {
+          "$ref": "#/$defs/source"
+        },
+        "aclState": {
+          "enum": [
+            "enabled",
+            "disabled",
+            "unavailable"
+          ]
+        },
+        "policyRevision": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "modes": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "plan",
+              "inspect",
+              "sample"
+            ]
+          },
+          "minItems": 0,
+          "maxItems": 3,
+          "uniqueItems": true
+        },
+        "formats": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "minItems": 0,
+          "maxItems": 10,
+          "uniqueItems": true
+        },
+        "capabilities": {
+          "$ref": "#/$defs/capabilities"
+        },
+        "limits": {
+          "$ref": "#/$defs/limits"
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "opaque": {
+          "type": "boolean"
+        },
+        "enforcement": {
+          "type": "object",
+          "properties": {
+            "structuredQuery": {
+              "type": "boolean"
+            },
+            "fieldReferences": {
+              "type": "boolean"
+            },
+            "transactionalEvidence": {
+              "type": "boolean"
+            },
+            "wholeRecordCAS": {
+              "type": "boolean"
+            },
+            "remoteEvidence": {
+              "type": "boolean"
+            },
+            "atomicBatch": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "structuredQuery",
+            "fieldReferences",
+            "transactionalEvidence",
+            "wholeRecordCAS",
+            "remoteEvidence",
+            "atomicBatch"
+          ],
+          "additionalProperties": false
+        },
+        "executionClasses": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/executionClass"
+          },
+          "minItems": 0,
+          "maxItems": 4,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "layerId",
+        "source",
+        "aclState",
+        "modes",
+        "formats",
+        "capabilities",
+        "limits",
+        "required",
+        "opaque",
+        "enforcement",
+        "executionClasses"
+      ],
+      "additionalProperties": false
+    },
+    "operationResult": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "requestOperationId": {
+          "$ref": "#/$defs/id"
+        },
+        "action": {
+          "$ref": "#/$defs/action"
+        },
+        "resource": {
+          "$ref": "#/$defs/resource"
+        },
+        "result": {
+          "$ref": "#/$defs/outcome"
+        },
+        "restrictionIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "minItems": 0,
+          "maxItems": 1000,
+          "uniqueItems": true
+        },
+        "allOf": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "minItems": 0,
+          "maxItems": 1000,
+          "uniqueItems": true
+        },
+        "executionClass": {
+          "$ref": "#/$defs/executionClass"
+        },
+        "callable": {
+          "$ref": "#/$defs/callable"
+        }
+      },
+      "required": [
+        "id",
+        "requestOperationId",
+        "action",
+        "resource",
+        "result",
+        "restrictionIds",
+        "allOf",
+        "executionClass"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "executionClass": {
+                "const": "stored_procedure"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "callable"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "callable"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "decision": {
+      "type": "object",
+      "properties": {
+        "operationId": {
+          "$ref": "#/$defs/id"
+        },
+        "result": {
+          "$ref": "#/$defs/outcome"
+        },
+        "policyRef": {
+          "$ref": "#/$defs/policyRef"
+        },
+        "scope": {
+          "$ref": "#/$defs/scopeName"
+        },
+        "ruleRefs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "minItems": 0,
+          "maxItems": 1000,
+          "uniqueItems": true
+        },
+        "bindingRefs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "enum": [
+                  "user",
+                  "role",
+                  "group",
+                  "everyone"
+                ]
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              }
+            },
+            "required": [
+              "kind",
+              "id"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 0,
+          "maxItems": 1000
+        },
+        "restrictionIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "minItems": 0,
+          "maxItems": 1000,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "operationId",
+        "result",
+        "scope",
+        "restrictionIds"
+      ],
+      "additionalProperties": false
+    },
+    "layer": {
+      "type": "object",
+      "properties": {
+        "layerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "source": {
+          "$ref": "#/$defs/source"
+        },
+        "aclState": {
+          "enum": [
+            "enabled",
+            "disabled",
+            "unavailable"
+          ]
+        },
+        "result": {
+          "$ref": "#/$defs/outcome"
+        },
+        "policyRevision": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "decisions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/decision"
+          },
+          "minItems": 0,
+          "maxItems": 1000
+        }
+      },
+      "required": [
+        "layerId",
+        "source",
+        "aclState",
+        "result",
+        "decisions"
+      ],
+      "additionalProperties": false
+    },
+    "blocker": {
+      "type": "object",
+      "properties": {
+        "operationId": {
+          "$ref": "#/$defs/id"
+        },
+        "code": {
+          "enum": [
+            "ACCESS_DENIED",
+            "ACL_RULE_DENIED",
+            "ACL_NO_MATCH",
+            "ACL_ROW_PREDICATE_FAILED",
+            "ACL_POST_IMAGE_FAILED",
+            "ACL_COLUMN_DENIED",
+            "ACL_EVALUATION_FAILED",
+            "ACL_CONFIGURATION_INVALID",
+            "ACL_SOURCE_UNAVAILABLE",
+            "ACL_ENFORCEMENT_UNSUPPORTED",
+            "ACL_PRINCIPAL_UNRESOLVED",
+            "ACL_CAPABILITY_DENIED",
+            "ACL_EXECUTION_CLASS_DENIED",
+            "ACL_CALLABLE_DENIED",
+            "ACL_COLLECTION_DENIED"
+          ]
+        },
+        "scope": {
+          "$ref": "#/$defs/scopeName"
+        },
+        "resource": {
+          "$ref": "#/$defs/resource"
+        },
+        "layerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "policyRef": {
+          "$ref": "#/$defs/policyRef"
+        },
+        "slot": {
+          "enum": [
+            "where",
+            "check",
+            "fields"
+          ]
+        },
+        "columns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/field"
+          },
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true
+        },
+        "retryable": {
+          "type": "boolean"
+        },
+        "executionClass": {
+          "$ref": "#/$defs/executionClass"
+        },
+        "callable": {
+          "$ref": "#/$defs/callable"
+        }
+      },
+      "required": [
+        "operationId",
+        "code",
+        "scope"
+      ],
+      "additionalProperties": false
+    },
+    "restriction": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/id"
+            },
+            "operationId": {
+              "$ref": "#/$defs/id"
+            },
+            "layerId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "policyRef": {
+              "$ref": "#/$defs/policyRef"
+            },
+            "enforced": {
+              "type": "boolean"
+            },
+            "representation": {
+              "const": "expression"
+            },
+            "kind": {
+              "enum": [
+                "row_filter",
+                "post_image_check"
+              ]
+            },
+            "expression": {
+              "$ref": "#/$defs/condition"
+            }
+          },
+          "required": [
+            "id",
+            "operationId",
+            "enforced",
+            "representation",
+            "kind",
+            "expression"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/id"
+            },
+            "operationId": {
+              "$ref": "#/$defs/id"
+            },
+            "layerId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "policyRef": {
+              "$ref": "#/$defs/policyRef"
+            },
+            "enforced": {
+              "type": "boolean"
+            },
+            "representation": {
+              "const": "fields"
+            },
+            "kind": {
+              "const": "field_allowlist"
+            },
+            "fields": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "minItems": 1,
+              "maxItems": 32,
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "id",
+            "operationId",
+            "enforced",
+            "representation",
+            "kind",
+            "fields"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/id"
+            },
+            "operationId": {
+              "$ref": "#/$defs/id"
+            },
+            "layerId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "policyRef": {
+              "$ref": "#/$defs/policyRef"
+            },
+            "enforced": {
+              "type": "boolean"
+            },
+            "representation": {
+              "const": "reference"
+            },
+            "kind": {
+              "enum": [
+                "row_filter",
+                "post_image_check",
+                "field_allowlist",
+                "opaque",
+                "field_mask"
+              ]
+            },
+            "omissionReason": {
+              "enum": [
+                "private",
+                "too_large",
+                "unsupported",
+                "not_authorized"
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "operationId",
+            "enforced",
+            "representation",
+            "kind",
+            "omissionReason"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/id"
+            },
+            "operationId": {
+              "$ref": "#/$defs/id"
+            },
+            "layerId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "policyRef": {
+              "$ref": "#/$defs/policyRef"
+            },
+            "enforced": {
+              "type": "boolean"
+            },
+            "representation": {
+              "const": "mask"
+            },
+            "kind": {
+              "const": "field_mask"
+            },
+            "mask": {
+              "$ref": "#/$defs/fieldMask"
+            }
+          },
+          "required": [
+            "id",
+            "operationId",
+            "enforced",
+            "representation",
+            "kind",
+            "mask"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "coverage": {
+      "type": "object",
+      "properties": {
+        "evaluation": {
+          "enum": [
+            "complete",
+            "partial"
+          ]
+        },
+        "disclosure": {
+          "enum": [
+            "full",
+            "redacted"
+          ]
+        },
+        "truncated": {
+          "type": "boolean"
+        },
+        "unevaluated": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "operationId": {
+                "$ref": "#/$defs/id"
+              },
+              "layerId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "reason": {
+                "enum": [
+                  "row_evidence_required",
+                  "evidence_not_authorized",
+                  "source_unavailable",
+                  "unsupported",
+                  "budget_exceeded"
+                ]
+              }
+            },
+            "required": [
+              "operationId",
+              "reason"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 0,
+          "maxItems": 1000
+        }
+      },
+      "required": [
+        "evaluation",
+        "disclosure",
+        "truncated",
+        "unevaluated"
+      ],
+      "additionalProperties": false
+    },
+    "sampleResult": {
+      "type": "object",
+      "properties": {
+        "requestedLimit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "evaluatedCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "selection": {
+          "const": "readable_candidates"
+        },
+        "order": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "field": {
+                "$ref": "#/$defs/field"
+              },
+              "direction": {
+                "enum": [
+                  "asc",
+                  "desc"
+                ]
+              }
+            },
+            "required": [
+              "field",
+              "direction"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 1,
+          "maxItems": 32
+        },
+        "exhaustive": {
+          "const": false
+        },
+        "templateOperationId": {
+          "$ref": "#/$defs/id"
+        },
+        "selectionResource": {
+          "$ref": "#/$defs/resource"
+        }
+      },
+      "required": [
+        "requestedLimit",
+        "evaluatedCount",
+        "selection",
+        "order",
+        "exhaustive",
+        "templateOperationId",
+        "selectionResource"
+      ],
+      "additionalProperties": false
+    },
+    "result": {
+      "type": "object",
+      "properties": {
+        "apiVersion": {
+          "const": "dtql.org/authorization/v1"
+        },
+        "requestId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "mode": {
+          "enum": [
+            "plan",
+            "inspect",
+            "sample",
+            "execution"
+          ]
+        },
+        "scope": {
+          "enum": [
+            "request",
+            "sample"
+          ]
+        },
+        "result": {
+          "$ref": "#/$defs/outcome"
+        },
+        "allowed": {
+          "type": "boolean"
+        },
+        "hypothetical": {
+          "type": "boolean"
+        },
+        "operations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/operationResult"
+          },
+          "minItems": 0,
+          "maxItems": 100
+        },
+        "layers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/layer"
+          },
+          "minItems": 0,
+          "maxItems": 100
+        },
+        "blockers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/blocker"
+          },
+          "minItems": 0,
+          "maxItems": 1000
+        },
+        "coverage": {
+          "$ref": "#/$defs/coverage"
+        },
+        "restrictions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/restriction"
+          },
+          "minItems": 0,
+          "maxItems": 1000
+        },
+        "sample": {
+          "$ref": "#/$defs/sampleResult"
+        }
+      },
+      "required": [
+        "apiVersion",
+        "requestId",
+        "mode",
+        "scope",
+        "result",
+        "allowed",
+        "hypothetical",
+        "operations",
+        "layers",
+        "blockers",
+        "coverage",
+        "restrictions"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "sample"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "sample"
+            ],
+            "properties": {
+              "scope": {
+                "const": "sample"
+              },
+              "allowed": {
+                "const": false
+              },
+              "result": {
+                "enum": [
+                  "conditional",
+                  "deny",
+                  "indeterminate"
+                ]
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "scope": {
+                "const": "request"
+              }
+            },
+            "not": {
+              "required": [
+                "sample"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "allowed": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "const": "allow"
+              },
+              "coverage": {
+                "properties": {
+                  "evaluation": {
+                    "const": "complete"
+                  },
+                  "truncated": {
+                    "const": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "enum": [
+                  "plan",
+                  "inspect",
+                  "sample"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "restrictions": {
+                "items": {
+                  "properties": {
+                    "enforced": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "result": {
+                "const": "allow"
+              },
+              "scope": {
+                "const": "request"
+              },
+              "coverage": {
+                "properties": {
+                  "evaluation": {
+                    "const": "complete"
+                  },
+                  "truncated": {
+                    "const": false
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "allowed": {
+                "const": true
+              }
+            }
+          }
+        }
+      ]
+    },
+    "policyMetadata": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "$ref": "#/$defs/source"
+        },
+        "policyRef": {
+          "$ref": "#/$defs/policyRef"
+        },
+        "visibility": {
+          "enum": [
+            "public",
+            "private"
+          ]
+        },
+        "editable": {
+          "type": "boolean"
+        },
+        "serializable": {
+          "type": "boolean"
+        },
+        "format": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "capabilities": {
+          "$ref": "#/$defs/capabilities"
+        }
+      },
+      "required": [
+        "source",
+        "policyRef",
+        "visibility",
+        "editable",
+        "serializable",
+        "capabilities"
+      ],
+      "additionalProperties": false
+    },
+    "policyEnvelope": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "$ref": "#/$defs/source"
+        },
+        "policyRef": {
+          "$ref": "#/$defs/policyRef"
+        },
+        "format": {
+          "enum": [
+            "dtql-policy-json",
+            "dtql-policy-yaml"
+          ]
+        },
+        "document": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/policy"
+            },
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1048576
+            }
+          ]
+        },
+        "capabilities": {
+          "$ref": "#/$defs/capabilities"
+        }
+      },
+      "required": [
+        "source",
+        "policyRef",
+        "format",
+        "document",
+        "capabilities"
+      ],
+      "additionalProperties": false
+    },
+    "policyWrite": {
+      "type": "object",
+      "properties": {
+        "format": {
+          "enum": [
+            "dtql-policy-json",
+            "dtql-policy-yaml"
+          ]
+        },
+        "document": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/policy"
+            },
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1048576
+            }
+          ]
+        }
+      },
+      "required": [
+        "format",
+        "document"
+      ],
+      "additionalProperties": false
+    },
+    "policyPage": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/policyMetadata"
+          },
+          "minItems": 0,
+          "maxItems": 100
+        },
+        "nextCursor": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "additionalProperties": false
+    },
+    "layersResponse": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/descriptor"
+          },
+          "minItems": 0,
+          "maxItems": 100
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "additionalProperties": false
+    },
+    "evidenceRequest": {
+      "type": "object",
+      "properties": {
+        "apiVersion": {
+          "const": "dtql.org/authorization/v1"
+        },
+        "resource": {
+          "$ref": "#/$defs/evidenceResource"
+        },
+        "requiredFields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/field"
+          },
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "apiVersion",
+        "resource",
+        "requiredFields"
+      ],
+      "additionalProperties": false
+    },
+    "evidenceField": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "path": {
+              "$ref": "#/$defs/field"
+            },
+            "state": {
+              "const": "present"
+            },
+            "value": {
+              "$ref": "#/$defs/json"
+            }
+          },
+          "required": [
+            "path",
+            "state",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "path": {
+              "$ref": "#/$defs/field"
+            },
+            "state": {
+              "const": "absent"
+            }
+          },
+          "required": [
+            "path",
+            "state"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "evidenceResponse": {
+      "type": "object",
+      "properties": {
+        "apiVersion": {
+          "const": "dtql.org/authorization/v1"
+        },
+        "resource": {
+          "$ref": "#/$defs/evidenceResource"
+        },
+        "exists": {
+          "const": true
+        },
+        "dataRevision": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidenceField"
+          },
+          "minItems": 1,
+          "maxItems": 32
+        }
+      },
+      "required": [
+        "apiVersion",
+        "resource",
+        "exists",
+        "dataRevision",
+        "fields"
+      ],
+      "additionalProperties": false
+    },
+    "error": {
+      "type": "object",
+      "properties": {
+        "error": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "enum": [
+                "access_denied",
+                "authorization_unavailable",
+                "authorization_unsupported",
+                "resource_unavailable",
+                "policy_revision_conflict",
+                "data_revision_conflict",
+                "duplicate_record_target",
+                "invalid_request",
+                "unauthenticated",
+                "precondition_required",
+                "resource_limit_exceeded"
+              ]
+            },
+            "requestId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "authorization": {
+              "$ref": "#/$defs/result"
+            },
+            "operationId": {
+              "$ref": "#/$defs/id"
+            }
+          },
+          "required": [
+            "code",
+            "requestId"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "error"
+      ],
+      "additionalProperties": false
+    },
+    "executionClass": {
+      "enum": [
+        "dtql",
+        "native_sql",
+        "native_graphql",
+        "stored_procedure"
+      ]
+    },
+    "callable": {
+      "type": "object",
+      "properties": {
+        "namespace": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[^./\\\\\\x00-\\x1f*]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[^./\\\\\\x00-\\x1f*]+$"
+        }
+      },
+      "required": [
+        "namespace",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "executionGate": {
+      "type": "object",
+      "properties": {
+        "allow": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "class": {
+                    "enum": [
+                      "dtql",
+                      "native_sql",
+                      "native_graphql"
+                    ]
+                  }
+                },
+                "required": [
+                  "class"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "class": {
+                    "const": "stored_procedure"
+                  },
+                  "namespace": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "pattern": "^[^./\\\\\\x00-\\x1f*]+$"
+                  },
+                  "include": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/nameMask"
+                    },
+                    "minItems": 1,
+                    "maxItems": 32,
+                    "uniqueItems": true
+                  },
+                  "exclude": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/nameMask"
+                    },
+                    "minItems": 0,
+                    "maxItems": 32,
+                    "uniqueItems": true
+                  }
+                },
+                "required": [
+                  "class",
+                  "namespace",
+                  "include"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          },
+          "minItems": 0,
+          "maxItems": 32,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "allow"
+      ],
+      "additionalProperties": false
+    },
+    "nameMask": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^(?:[^*./\\\\\\x00-\\x20\\x7f?\\[\\]]+|\\*|[^*./\\\\\\x00-\\x20\\x7f?\\[\\]]+\\*|\\*[^*./\\\\\\x00-\\x20\\x7f?\\[\\]]+)$"
+    },
+    "fieldPattern": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "collectionMask": {
+      "type": "object",
+      "properties": {
+        "include": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/nameMask"
+          },
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true
+        },
+        "exclude": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/nameMask"
+          },
+          "minItems": 0,
+          "maxItems": 32,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "include"
+      ],
+      "additionalProperties": false
+    },
+    "fieldMask": {
+      "type": "object",
+      "properties": {
+        "include": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/fieldPattern"
+          },
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true
+        },
+        "exclude": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/fieldPattern"
+          },
+          "minItems": 0,
+          "maxItems": 32,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "include"
+      ],
+      "additionalProperties": false
+    },
+    "evidenceResource": {
+      "type": "object",
+      "properties": {
+        "databaseId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "table": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "rowId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "required": [
+        "databaseId",
+        "path"
+      ],
+      "additionalProperties": false
+    },
+    "batchRequest": {
+      "type": "object",
+      "properties": {
+        "operations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/operation"
+          },
+          "minItems": 1,
+          "maxItems": 100
+        }
+      },
+      "required": [
+        "operations"
+      ],
+      "additionalProperties": false
+    },
+    "batchResult": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/id"
+              },
+              "dataRevision": {
+                "$ref": "#/$defs/string"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 1,
+          "maxItems": 100
+        },
+        "authorization": {
+          "$ref": "#/$defs/result"
+        }
+      },
+      "required": [
+        "items",
+        "authorization"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "revision": "A2",
+  "inputSHA256": "245ecd60af3902dee4404b2f8e5c7969d8380ea37683a31c6124bbdfec92515a",
+  "reviewers": {
+    "astra": {
+      "task": "/root/astra_plan_review",
+      "requestedModel": "gpt-6-astra",
+      "effort": "high"
+    },
+    "opus": {
+      "requestedModel": "opus",
+      "effort": "high",
+      "tools": "disabled",
+      "telemetry": "opus-run-metadata.json"
+    }
+  },
+  "independence": "Same frozen input; no current peer findings visible; author sole writer. Prior approved closure equally visible.",
+  "reconciliation": "Separate agent after both reports sealed",
+  "implementationDispatch": false,
+  "status": "reviewed, reconciled, corrections verified; human dispatch checkpoint",
+  "reconcilerTask": "/root/plan_reconciler",
+  "supplementSHA256": "1dc80f6ab3a7d7c40298d3d7af383cbdc3aad21a5020b2fae8af70b8f9a1244c",
+  "finalVerifiedSHA256": "efcbf451f8363d9180ab84824a6816c394781029944e2e52e3ca3d9ee556b874"
+}

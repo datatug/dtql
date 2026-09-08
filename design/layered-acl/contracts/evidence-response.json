@@ -1,0 +1,25 @@
+{
+  "apiVersion": "dtql.org/authorization/v1",
+  "resource": {
+    "databaseId": "crm",
+    "path": "/customers/101",
+    "rowId": "101"
+  },
+  "exists": true,
+  "dataRevision": "whole-record-r7",
+  "fields": [
+    {
+      "path": [
+        "name"
+      ],
+      "state": "present",
+      "value": "Ada"
+    },
+    {
+      "path": [
+        "middle_name"
+      ],
+      "state": "absent"
+    }
+  ]
+}

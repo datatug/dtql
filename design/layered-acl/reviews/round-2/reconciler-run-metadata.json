@@ -1,0 +1,27 @@
+{
+  "role": "reconciler",
+  "model": "gpt-6-astra",
+  "sessionFile": "rollout-2026-09-08T15-11-48-01a08193-4754-7d53-889e-1a831c411e80.jsonl",
+  "startedAt": "2026-09-08T15:11:48.143Z",
+  "finishedAt": "2026-09-08T15:18:14.274Z",
+  "elapsedSeconds": 386.161,
+  "usage": {
+    "input_tokens": 1026564,
+    "cached_input_tokens": 975360,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 8036,
+    "reasoning_output_tokens": 1861,
+    "total_tokens": 1034600
+  },
+  "cumulativeUsage": {
+    "input_tokens": 1026564,
+    "cached_input_tokens": 975360,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 8036,
+    "reasoning_output_tokens": 1861,
+    "total_tokens": 1034600
+  },
+  "reportedCostUSD": null,
+  "costAvailability": "Codex harness exposes tokens but not monetary cost; unknown is not zero",
+  "counting": "Cumulative input includes cached repeated context; output includes reasoning. Follow-up counts are cumulative differences."
+}

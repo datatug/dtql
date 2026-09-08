@@ -1,0 +1,67 @@
+{
+  "apiVersion": "dtql.org/access/v1",
+  "kind": "AccessPolicy",
+  "metadata": {
+    "name": "surface-masks",
+    "visibility": "public"
+  },
+  "target": {
+    "database": "crm"
+  },
+  "composition": "dalgo-hierarchical-v1",
+  "default": "deny",
+  "collectionMask": {
+    "include": [
+      "*"
+    ],
+    "exclude": [
+      "sys_*"
+    ]
+  },
+  "execution": {
+    "allow": [
+      {
+        "class": "dtql"
+      },
+      {
+        "class": "stored_procedure",
+        "namespace": "public",
+        "include": [
+          "User_*"
+        ],
+        "exclude": [
+          "User_Delete"
+        ]
+      }
+    ]
+  },
+  "scopes": [
+    {
+      "path": "/",
+      "rules": [
+        {
+          "id": "surface",
+          "effect": "allow",
+          "operations": [
+            "get",
+            "exists",
+            "query",
+            "insert",
+            "set",
+            "update",
+            "delete"
+          ],
+          "fieldMask": {
+            "include": [
+              "*"
+            ],
+            "exclude": [
+              "address.internal_*",
+              "secret_*"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

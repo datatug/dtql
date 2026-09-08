@@ -1,6 +1,6 @@
 # Human checkpoint — design and implementation plan reviewed
 
-Status: **reviewed draft; not approved for implementation or contract freeze**. No MVP implementation has started. The frozen A1 packet includes both architecture/specification and [the implementation work packages](../12-work-packages.md); both independent reviewers and the separate reconciler reviewed that same plan with the design.
+Historical A1 checkpoint. **The user subsequently approved these H1–H7 resolutions and reconciler-accepted suggestions and requested an A2 implementation-plan review.** Implementation dispatch remains unauthorized. No MVP implementation has started. The frozen A1 packet includes both architecture/specification and [the implementation work packages](../12-work-packages.md); both independent reviewers and the separate reconciler reviewed that same plan with the design.
 
 ## Review material
 
@@ -13,7 +13,7 @@ Status: **reviewed draft; not approved for implementation or contract freeze**. 
 | [Measured cost/value report](cost-value.md) | Actual exposed telemetry, semantic overlap and reviewer contribution; missing costs explicitly unavailable |
 | [Frozen input](input-A1.txt), [manifest](manifest-A1.json), [rubric](rubric.md) | Identical material, independent parallel reviews; packet SHA256 `efd8dd40013888eee43ab8582e35b506d9fbce9e61a8e08d21a4c6b004821b94` |
 
-The reviewers' different headline verdicts are not a disagreement about the architecture: both require corrections before independent implementation. Original reviews and A1 documents are preserved unchanged for traceability. Reconciler recommendations are not automatically approved decisions.
+The reviewers' different headline verdicts are not a disagreement about the architecture: both require corrections before independent implementation. Original reviews and the complete frozen A1 input remain unchanged; original standalone documents are also recoverable from commit `dcd3bc0`. Current design files evolve as A2. The approval applies to accepted reconciler recommendations and H1–H7, not rejected or deferred raw findings.
 
 ## What stays settled
 

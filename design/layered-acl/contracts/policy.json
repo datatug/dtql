@@ -1,0 +1,59 @@
+{
+  "apiVersion": "dtql.org/access/v1",
+  "kind": "AccessPolicy",
+  "metadata": {
+    "name": "tenant-access",
+    "visibility": "public"
+  },
+  "target": {
+    "database": "crm"
+  },
+  "composition": "dalgo-hierarchical-v1",
+  "default": "deny",
+  "ruleSets": {
+    "editor": [
+      {
+        "path": "/customers",
+        "rules": [
+          {
+            "id": "update-tenant",
+            "effect": "allow",
+            "operations": [
+              "update"
+            ],
+            "where": {
+              "op": "==",
+              "left": {
+                "field": "tenant"
+              },
+              "right": {
+                "param": "tenant"
+              }
+            },
+            "fields": [
+              "name",
+              "email"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "bindings": {
+    "users": {
+      "user-alice": [
+        "editor"
+      ]
+    },
+    "roles": {
+      "crm-editor": [
+        "editor"
+      ]
+    },
+    "groups": {
+      "crm-team": [
+        "editor"
+      ]
+    }
+  }
+}

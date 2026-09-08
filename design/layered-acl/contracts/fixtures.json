@@ -1,0 +1,97 @@
+[
+  {
+    "file": "policy.json",
+    "definition": "policy",
+    "valid": true
+  },
+  {
+    "file": "inspect-request.json",
+    "definition": "request",
+    "valid": true
+  },
+  {
+    "file": "inspect-result.json",
+    "definition": "result",
+    "valid": true
+  },
+  {
+    "file": "sample-result.json",
+    "definition": "result",
+    "valid": true
+  },
+  {
+    "file": "opaque-plan-result.json",
+    "definition": "result",
+    "valid": true
+  },
+  {
+    "file": "evidence-request.json",
+    "definition": "evidenceRequest",
+    "valid": true
+  },
+  {
+    "file": "evidence-response.json",
+    "definition": "evidenceResponse",
+    "valid": true
+  },
+  {
+    "file": "invalid-sample-allow.json",
+    "definition": "result",
+    "valid": false
+  },
+  {
+    "file": "invalid-reference-expression.json",
+    "definition": "result",
+    "valid": false
+  },
+  {
+    "file": "sample-selection-route-denied.json",
+    "definition": "result",
+    "valid": true
+  },
+  {
+    "file": "sample-selection-field-denied.json",
+    "definition": "result",
+    "valid": true
+  },
+  {
+    "file": "sample-selection-unavailable.json",
+    "definition": "result",
+    "valid": true
+  },
+  {
+    "file": "sample-empty.json",
+    "definition": "result",
+    "valid": true
+  },
+  {
+    "file": "sample-template-collision-avoided.json",
+    "definition": "result",
+    "valid": true
+  },
+  {
+    "file": "sample-request-s1.json",
+    "definition": "request",
+    "valid": true
+  },
+  {
+    "file": "mask-policy.json",
+    "definition": "policy",
+    "valid": true
+  },
+  {
+    "file": "invalid-fields-and-mask.json",
+    "definition": "policy",
+    "valid": false
+  },
+  {
+    "file": "invalid-interior-mask.json",
+    "definition": "policy",
+    "valid": false
+  },
+  {
+    "file": "mask-restriction-result.json",
+    "definition": "result",
+    "valid": true
+  }
+]

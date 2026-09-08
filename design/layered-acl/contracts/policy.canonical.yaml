@@ -1,0 +1,36 @@
+apiVersion: dtql.org/access/v1
+bindings:
+  groups:
+    crm-team:
+    - editor
+  roles:
+    crm-editor:
+    - editor
+  users:
+    user-alice:
+    - editor
+composition: dalgo-hierarchical-v1
+default: deny
+kind: AccessPolicy
+metadata:
+  name: tenant-access
+  visibility: public
+ruleSets:
+  editor:
+  - path: /customers
+    rules:
+    - effect: allow
+      fields:
+      - name
+      - email
+      id: update-tenant
+      operations:
+      - update
+      where:
+        left:
+          field: tenant
+        op: ==
+        right:
+          param: tenant
+target:
+  database: crm

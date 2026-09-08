@@ -1,6 +1,6 @@
 # Executable implementation plan and handoff
 
-Status: design work packages only. Do not start implementation or dispatch Corpus until human approval after independent review/reconciliation. Estimates below are relative effort/risk judgments, not measured hours or token costs. Re-audit pinned dependencies at implementation start.
+Status: A2 plan incorporating approved A1 recommendations. [Executable package cards](16-handoff.md) refine the original WP numbers below; C7 adds route/mask controls. Design work packages only. Do not start implementation or dispatch Corpus until human approval after independent review/reconciliation. Estimates below are relative effort/risk judgments, not measured hours or token costs. Re-audit pinned dependencies at implementation start.
 
 ## Shared contract freeze
 
@@ -11,6 +11,7 @@ Status: design work packages only. Do not start implementation or dispatch Corpu
 | C3 | Canonical realm/subject/actor, trusted context, private-policy admin, deployment identity profile (06/10) | Confirm hosted ADR reuse and self-hosted fixture profile. |
 | C4 | Provider/reader/manager/inspector contracts, capabilities, pure evaluation, errors (05) | Approve additive DALgo implementation home. |
 | C5 | Whole-record revision evidence, conditional write preconditions, short-operation policy snapshots (02/08) | Approve consistency limitations and remote evidence requirement. |
+| C7 | Execution-class gate and canonical procedure include/exclude masks (03/04); unsupported native effects remain closed | User-requested controls; exact A2 forms reviewed with plan. |
 | C6 | Structured query subset, key-targeted set-assignment UPDATE, final-image constraints and sample bounds | Approve a narrow real vertical slice and explicit unsupported behavior. |
 
 Freeze a reviewed contract revision and machine-readable golden vectors in DTQL; every downstream package references that exact revision. Later contract changes require coordinated review, not divergent implementation assumptions. No parser module extraction, new InGitDB HTTP server, custom ACL service or long-running transaction subsystem in these packages.
@@ -20,12 +21,12 @@ Freeze a reviewed contract revision and machine-readable golden vectors in DTQL;
 ```text
 Human sign-off → WP0 baseline/pins → WP1 contract fixtures
 WP1 → WP2 DALgo model/evaluator → WP3 DALgo enforcement
-WP1 → WP4a InGitDB policy storage scaffolding
-WP1 → WP5a OpenVaultDB transport/store scaffolding
+WP1 → WP4a InGitDB policy storage scaffolding (completion also requires WP2a/b)
+WP1 → WP5a OpenVaultDB transport/store scaffolding (completion also requires WP2a/b)
 WP1 → WP7a DataTug forms against shared contract fixtures
 WP3 + WP4a → WP4b InGitDB secured adapter/revisions
-WP3 + WP4b + WP5a → WP5b OpenVaultDB enforcement/HTTP driver
-WP3 + WP5b → WP6 DataTug daemon integration
+WP3 + WP4b + WP5a → WP5b OpenVaultDB enforcement + WP5c HTTP driver (paired)
+WP3 + WP5b + WP5c → WP6 DataTug daemon integration
 WP6 + WP7a → WP7b live DataTug UX
 WP4b + WP5b + WP6 + WP7b → WP8 vertical E2E/security → WP9 release/docs
 ```
@@ -38,7 +39,7 @@ Repos: all audited providers/consumers. Dependencies: human sign-off. Tasks: ins
 
 ## WP1 — DTQL contract schemas and conformance fixtures
 
-Repos: `datatug/dtql` (normative spec), DALgo test consumer, DataTug TS fixture consumer. Dependencies: WP0 and C1–C6 decisions. Tasks: finalize C2 closed schema including optional plan-without-mutation, sample operation template, layer descriptors and restriction variants; produce JSON Schema for policies/requests/results/envelopes; generate valid and negative fixtures; canonical YAML expected bytes; compatibility vectors for legacy policy conversion; schema freshness/validation check. Preserve existing query schema unchanged. Acceptance: all fixture examples validate; duplicate-key/depth checks specified outside JSON Schema where necessary; semantic validators reject target/query mismatch and private metadata leaks; no prose/schema discrepancy. Tests: T04/T09/T15/T18/T19 fixtures and code-taxonomy exhaustiveness. Risk/effort: medium; avoid overengineering a generic schema generation framework.
+Repos: `datatug/dtql` (normative spec), DALgo test consumer, DataTug TS fixture consumer. Dependencies: WP0 and C1–C6 decisions. Tasks: consume the completed A2 schemas and golden specification artifacts; implement validation/distribution and expand the semantic fixture harness; canonical YAML expected bytes; compatibility vectors for legacy policy conversion; schema freshness/validation check. Preserve existing query schema unchanged. Acceptance: all fixture examples validate; duplicate-key/depth checks specified outside JSON Schema where necessary; semantic validators reject target/query mismatch and private metadata leaks; no prose/schema discrepancy. Tests: T04/T09/T15/T18/T19 fixtures and code-taxonomy exhaustiveness. Risk/effort: medium; avoid overengineering a generic schema generation framework.
 
 ## WP2 — DALgo documents, principal snapshots and multi-decisions
 
@@ -66,7 +67,7 @@ Repo: `datatug/datatug-apps`. WP7a depends WP1, WP7b depends WP6+WP7a. Tasks: ow
 
 ## WP8 — Real vertical acceptance and security verification
 
-Repos: DataTug E2E harness plus existing OpenVaultDB/InGitDB conformance harnesses. Depends WP4b/5b/6/7b. Tasks: provision fixture tokens/current membership/policies, real services and Git data, execute T01–T19, capture sanitized artifacts; verify policy edit→restart/reconnect→conditions/inspect/sample→query→UPDATE; simulate stale data/policy and unavailable providers; separate direct-lower routes. Acceptance: all mandatory tests pass with actual storage and no mocked lower decisions, no skipped critical cases; meaningful evidence of no denied writes. Tests: one complete vertical run plus focused reruns on actual changes/failures, not repeated fleet scans. Risk/effort: medium-high; E2E harness integration is enabling work, not optional polish.
+Repos: DataTug E2E harness plus existing OpenVaultDB/InGitDB conformance harnesses. Depends WP4b/5b/6/7b. Tasks: provision fixture tokens/current membership/policies, real services and Git data, execute T01–T21, capture sanitized artifacts; verify policy edit→restart/reconnect→conditions/inspect/sample→query→UPDATE; simulate stale data/policy and unavailable providers; separate direct-lower routes. Acceptance: all mandatory tests pass with actual storage and no mocked lower decisions, no skipped critical cases; meaningful evidence of no denied writes. Tests: one complete vertical run plus focused reruns on actual changes/failures, not repeated fleet scans. Risk/effort: medium-high; E2E harness integration is enabling work, not optional polish.
 
 ## WP9 — Documentation, release and approved handoff completion
 

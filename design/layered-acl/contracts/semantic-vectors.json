@@ -1,0 +1,379 @@
+[
+  {
+    "id": "identity-kind",
+    "policyUser": "same",
+    "ownerRealm": "r1",
+    "subject": {
+      "realm": "r1",
+      "kind": "application",
+      "id": "same"
+    },
+    "expected": "no user binding"
+  },
+  {
+    "id": "identity-realm",
+    "policyUser": "same",
+    "ownerRealm": "r1",
+    "subject": {
+      "realm": "r2",
+      "kind": "user",
+      "id": "same"
+    },
+    "expected": "unresolved without trusted realm mapping"
+  },
+  {
+    "id": "currentUser-service",
+    "parameter": "currentUser",
+    "subjectKind": "service",
+    "expected": "ACL_EVALUATION_FAILED"
+  },
+  {
+    "id": "null-equals-null",
+    "condition": {
+      "op": "==",
+      "left": {
+        "field": "x"
+      },
+      "right": {
+        "value": null
+      }
+    },
+    "image": {
+      "x": null
+    },
+    "expected": true
+  },
+  {
+    "id": "missing-is-not-null",
+    "condition": {
+      "op": "==",
+      "left": {
+        "field": "x"
+      },
+      "right": {
+        "value": null
+      }
+    },
+    "image": {},
+    "expected": false
+  },
+  {
+    "id": "number-order",
+    "condition": {
+      "op": ">",
+      "left": {
+        "field": "x"
+      },
+      "right": {
+        "value": 9
+      }
+    },
+    "image": {
+      "x": 10
+    },
+    "expected": true
+  },
+  {
+    "id": "no-string-coercion",
+    "condition": {
+      "op": ">",
+      "left": {
+        "field": "x"
+      },
+      "right": {
+        "value": 9
+      }
+    },
+    "image": {
+      "x": "10"
+    },
+    "expected": "ACL_EVALUATION_FAILED"
+  },
+  {
+    "id": "in",
+    "condition": {
+      "op": "In",
+      "left": {
+        "field": "x"
+      },
+      "right": {
+        "values": [
+          "IE",
+          "US"
+        ]
+      }
+    },
+    "image": {
+      "x": "IE"
+    },
+    "expected": true
+  },
+  {
+    "id": "string-order",
+    "condition": {
+      "op": ">",
+      "left": {
+        "field": "x"
+      },
+      "right": {
+        "value": "z"
+      }
+    },
+    "image": {
+      "x": "é"
+    },
+    "expected": true
+  },
+  {
+    "id": "integer-overflow",
+    "value": 9007199254740992,
+    "expected": "validation rejected"
+  },
+  {
+    "id": "capture",
+    "pathPattern": "/tenants/{tenantID}/customers",
+    "resource": "/tenants/A/customers/1",
+    "parameter": "path.tenantID",
+    "expected": "A"
+  },
+  {
+    "id": "nested",
+    "condition": {
+      "op": "==",
+      "left": {
+        "field": "address.country"
+      },
+      "right": {
+        "value": "IE"
+      }
+    },
+    "image": {
+      "address": {
+        "country": "IE"
+      }
+    },
+    "expected": true
+  },
+  {
+    "id": "evidence-withheld",
+    "requiredFields": [
+      [
+        "tenant"
+      ]
+    ],
+    "responseFields": [],
+    "expected": "unknown/unsupported, not absent"
+  },
+  {
+    "id": "batch-repeated",
+    "targets": [
+      "/customers/101",
+      "/customers/%31%30%31"
+    ],
+    "expected": "duplicate_record_target before reads or mutation"
+  },
+  {
+    "id": "mask-include",
+    "include": [
+      "User_*"
+    ],
+    "exclude": [],
+    "name": "User_Create",
+    "expected": true
+  },
+  {
+    "id": "mask-exclude",
+    "include": [
+      "*"
+    ],
+    "exclude": [
+      "sys_*"
+    ],
+    "name": "sys_read",
+    "expected": false
+  },
+  {
+    "id": "mask-exclusion-wins",
+    "include": [
+      "User_*",
+      "*"
+    ],
+    "exclude": [
+      "User_Delete"
+    ],
+    "name": "User_Delete",
+    "expected": false
+  },
+  {
+    "id": "mask-pass-unsupported",
+    "class": "stored_procedure",
+    "namespace": "public",
+    "include": [
+      "User_*"
+    ],
+    "name": "User_Create",
+    "gate": "allow",
+    "expected": "ACL_ENFORCEMENT_UNSUPPORTED; no invocation"
+  },
+  {
+    "id": "sample-all-allow",
+    "perRowResults": [
+      "allow",
+      "allow"
+    ],
+    "complete": true,
+    "expected": {
+      "result": "conditional",
+      "allowed": false
+    }
+  },
+  {
+    "id": "sample-empty",
+    "perRowResults": [],
+    "complete": true,
+    "expected": {
+      "result": "conditional",
+      "allowed": false
+    }
+  },
+  {
+    "id": "sample-partial",
+    "perRowResults": [
+      "allow"
+    ],
+    "complete": false,
+    "expected": {
+      "result": "indeterminate",
+      "allowed": false
+    }
+  },
+  {
+    "id": "sample-deny-partial",
+    "perRowResults": [
+      "deny"
+    ],
+    "complete": false,
+    "expected": {
+      "result": "deny",
+      "allowed": false
+    }
+  },
+  {
+    "id": "parent-evidence-withheld-present",
+    "mask": {
+      "include": [
+        "address.*"
+      ],
+      "exclude": [
+        "address.internal_*"
+      ]
+    },
+    "requiredFields": [
+      [
+        "address"
+      ]
+    ],
+    "image": {
+      "address": {
+        "city": "Dublin",
+        "internal_code": "hidden"
+      }
+    },
+    "expected": "parent evidence unsupported; no partial present object"
+  },
+  {
+    "id": "parent-evidence-withheld-absent",
+    "mask": {
+      "include": [
+        "address.*"
+      ],
+      "exclude": [
+        "address.internal_*"
+      ]
+    },
+    "requiredFields": [
+      [
+        "address"
+      ]
+    ],
+    "image": {
+      "address": {
+        "city": "Dublin"
+      }
+    },
+    "expected": "parent evidence unsupported; no excluded absence oracle"
+  },
+  {
+    "id": "now-numeric",
+    "hostUnixMilliseconds": 1700000000000,
+    "parameter": "now",
+    "expected": 1700000000000
+  },
+  {
+    "id": "list-param-equality",
+    "op": "==",
+    "parameter": "principal.roles",
+    "value": [
+      "editor"
+    ],
+    "expected": "ACL_EVALUATION_FAILED"
+  },
+  {
+    "id": "new-mask-whitespace",
+    "include": [
+      " User_*"
+    ],
+    "expected": "validation rejected without trim"
+  },
+  {
+    "id": "private-only-edit",
+    "publicDocumentUnchanged": true,
+    "expected": "public policy ETag unchanged; non-admin layer revision always omitted"
+  },
+  {
+    "id": "dynamic-worker",
+    "aclProfile": "dtql.org/access/v1",
+    "workerOperations": [
+      "update A",
+      "read B",
+      "update B"
+    ],
+    "expected": "ACL_ENFORCEMENT_UNSUPPORTED before worker invocation"
+  },
+  {
+    "id": "legacy-parent-pattern",
+    "patternsCompared": [
+      "address",
+      "address.*"
+    ],
+    "expected": "equal inclusion decisions for parent and descendants"
+  },
+  {
+    "id": "flat-dot-key",
+    "wireField": [
+      "a.b"
+    ],
+    "policyFields": [
+      "a.b"
+    ],
+    "expected": "normalization rejected; not nested a,b"
+  },
+  {
+    "id": "nested-key",
+    "wireField": [
+      "a",
+      "b"
+    ],
+    "policyFields": [
+      "a.b"
+    ],
+    "expected": "matches nested path only"
+  },
+  {
+    "id": "unsupported-selector-load",
+    "selector": {
+      "collectionGroup": "customers"
+    },
+    "expected": "entire enabled candidate policy set invalid; never ignore scope"
+  }
+]

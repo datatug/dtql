@@ -1,0 +1,110 @@
+{
+  "scope": "A2 main + A2-S1 mask supplement; correction verification/reconciliation separate",
+  "astra": {
+    "usage": {
+      "input_tokens": 1968263,
+      "cached_input_tokens": 1875328,
+      "output_tokens": 17803,
+      "reasoning_output_tokens": 12687,
+      "total_tokens": 1986066
+    },
+    "reportedCostUSD": null,
+    "elapsedSeconds": 900.41,
+    "acceptedRoots": 6,
+    "uniqueAcceptedRoots": 4,
+    "independentlyEstablishedHighContributions": 2
+  },
+  "opus": {
+    "modelUsage": {
+      "claude-haiku-4-5-20251001": {
+        "inputTokens": 158982,
+        "outputTokens": 37,
+        "totalTokens": 159019,
+        "reportedCostUSD": 0.159167
+      },
+      "claude-opus-5": {
+        "inputTokens": 217339,
+        "outputTokens": 35329,
+        "totalTokens": 252668,
+        "reportedCostUSD": 3.0565949999999997
+      }
+    },
+    "reportedCostUSD": 3.215762,
+    "elapsedSeconds": 510.078,
+    "acceptedRoots": 17,
+    "uniqueAcceptedRoots": 15,
+    "independentlyEstablishedHighContributions": 0,
+    "costPerAcceptedRootUSD": 0.1891624705882353,
+    "costPerUniqueAcceptedRootUSD": 0.2143841333333333
+  },
+  "overlap": {
+    "astraRoots": 6,
+    "opusRoots": 31,
+    "sharedRoots": 2,
+    "unionRoots": 35,
+    "jaccard": 0.05714285714285714,
+    "smallerReviewOverlap": 0.3333333333333333,
+    "acceptedUnion": 21,
+    "acceptedShared": 2
+  },
+  "limitations": [
+    "Costs are tooling list/API reports, not invoices. Codex USD unavailable.",
+    "Input includes cached rereads; different harnesses prevent controlled token-efficiency comparison.",
+    "Low clarifications count as accepted roots; shared high root credit does not imply equal independent depth.",
+    "Astra supplement start corrected using task_started event at 15:11:00.113Z; earlier metadata used previous completion time."
+  ],
+  "reconciler-run-metadata.json": {
+    "role": "reconciler",
+    "model": "gpt-6-astra",
+    "sessionFile": "rollout-2026-09-08T15-11-48-01a08193-4754-7d53-889e-1a831c411e80.jsonl",
+    "startedAt": "2026-09-08T15:11:48.143Z",
+    "finishedAt": "2026-09-08T15:18:14.274Z",
+    "elapsedSeconds": 386.161,
+    "usage": {
+      "input_tokens": 1026564,
+      "cached_input_tokens": 975360,
+      "cache_write_input_tokens": 0,
+      "output_tokens": 8036,
+      "reasoning_output_tokens": 1861,
+      "total_tokens": 1034600
+    },
+    "cumulativeUsage": {
+      "input_tokens": 1026564,
+      "cached_input_tokens": 975360,
+      "cache_write_input_tokens": 0,
+      "output_tokens": 8036,
+      "reasoning_output_tokens": 1861,
+      "total_tokens": 1034600
+    },
+    "reportedCostUSD": null,
+    "costAvailability": "Codex harness exposes tokens but not monetary cost; unknown is not zero",
+    "counting": "Cumulative input includes cached repeated context; output includes reasoning. Follow-up counts are cumulative differences."
+  },
+  "reconciler-verification-run-metadata.json": {
+    "role": "reconciler",
+    "model": "gpt-6-astra",
+    "sessionFile": "rollout-2026-09-08T15-11-48-01a08193-4754-7d53-889e-1a831c411e80.jsonl",
+    "startedAt": "2026-09-08T15:20:42.357Z",
+    "finishedAt": "2026-09-08T15:23:06.569Z",
+    "elapsedSeconds": 144.212,
+    "usage": {
+      "input_tokens": 1210283,
+      "cached_input_tokens": 1174144,
+      "cache_write_input_tokens": 0,
+      "output_tokens": 2628,
+      "reasoning_output_tokens": 450,
+      "total_tokens": 1212911
+    },
+    "cumulativeUsage": {
+      "input_tokens": 2236847,
+      "cached_input_tokens": 2149504,
+      "cache_write_input_tokens": 0,
+      "output_tokens": 10664,
+      "reasoning_output_tokens": 2311,
+      "total_tokens": 2247511
+    },
+    "reportedCostUSD": null,
+    "costAvailability": "Codex harness exposes tokens but not monetary cost; unknown is not zero",
+    "counting": "Cumulative input includes cached repeated context; output includes reasoning. Follow-up counts are cumulative differences."
+  }
+}

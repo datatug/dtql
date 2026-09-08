@@ -6,7 +6,7 @@ These are implementation acceptance specifications, not tests already implemente
 
 Start the real DataTug daemon, OpenVaultDB HTTP server and local InGitDB adapter, with a real Git repository and persisted policy stores at all three owners. Drive the real browser policy workspace/query grid/record edit via the app's E2E runner. Record exact component SHAs/versions, policy revisions and test artifact hashes. Policy fixtures explicitly use `visibility:public` where non-admin reference diagnostics are asserted; privacy tests use private policies.
 
-Principals in realm `acl-e2e`: `user-alice` (role `crm-editor`, group `crm-team`, trusted `tenant=A`), `user-bob` (no editor binding), `policy-admin` (owner-scoped policy admin/CRUD grants), `policy-editor` (delegated CRUD only for selected public policies), actor `datatug-client` (delegated to Alice, read/update scope only). Also provision direct OpenVaultDB Alice token and direct InGitDB trusted principal context. Admin rights per owner are explicit. Diagnostic Alice has `access:diagnostics` for safe references at all owners; ordinary Alice token omits it. No owner token in browser.
+Principals in realm `acl-e2e`: `user-alice` (role `crm-editor`, group `crm-team`, trusted `tenant=A`), `user-bob` (no editor binding), `policy-admin` (owner-scoped policy admin/CRUD grants), `policy-editor` (delegated CRUD only for selected public policies), actor `datatug-client` (delegated to Alice, read/update scope only). Also provision direct OpenVaultDB Alice token and direct InGitDB trusted principal context. Admin rights per owner are explicit. Diagnostic Alice has `access:diagnostics` for safe references at all owners and an owner-scoped `access:inspect-protected` grant for the concrete fixture keys (including 102); ordinary Alice omits both. Neither grant reveals private policies or raw row contents. No owner token in browser.
 
 Rows have fields `id,tenant,country,status,name,email,credit_limit`. ID is the record key and visible for authorized rows; update of ID is unsupported.
 
@@ -88,6 +88,50 @@ Given instrumented storage/provider callbacks, plan makes zero data reads; inspe
 
 ## Test layers and run evidence
 
-WP1 conformance vectors specify exact request/decision examples; WP2 unit/property/fuzz tests; WP4–6 real adapter/HTTP tests; WP7 UI interaction tests; WP8 full browser vertical flow. Reuse existing DALgo tests and InGitDB temporary-repo fixtures. Version-pin all Go/TS modules in an E2E manifest; CI artifacts include sanitized requests/responses, layer revision traces, Git before/after and browser failure screenshots. Test assertions must verify all 13 mission proofs: T03(1,2,12), T04(3), T05/T06(4,5,6,13), T01/T02(7,8,9), T07(10,11).
+WP1 conformance vectors specify exact request/decision examples; WP2 unit/property/fuzz tests; WP4–6 real adapter/HTTP tests; WP7 UI interaction tests; WP8 full browser vertical flow. Reuse existing DALgo tests and InGitDB temporary-repo fixtures. Version-pin all Go/TS modules in an E2E manifest; CI artifacts include sanitized requests/responses, layer revision traces, Git before/after and browser failure screenshots. The explicit mission proof table below maps all 13 proofs; T20/T21 add execution and resource-mask coverage.
 
-Pass gate: all mandatory T01–T19 checks at supported capabilities, no skipped reference InGitDB/UI cases, no credentials/row secrets in artifacts, and no forced best-effort adapter mode. Broader cloud/native sources may be explicitly out of profile, not silently skipped while claiming conformance.
+Pass gate: all mandatory T01–T21 and V01–V08 checks at supported capabilities, no skipped reference InGitDB/UI cases, no credentials/row secrets in artifacts, and no forced best-effort adapter mode. Broader cloud/native sources may be explicitly out of profile, not silently skipped while claiming conformance.
+
+## A2 required regression vectors
+
+T20 — Execution classes/masks: a mandatory DTQL-only gate rejects native SQL/GraphQL and every procedure, including a SQL CALL disguised as native_sql. `public` include User_* admits names User_Create/User_ and denies Users_Create/sys_User; include * exclude sys_* rejects sys_read; include User_* exclude User_Delete rejects User_Delete even with a second matching include. Different namespace and canonical case remain distinct. Test mask round-trip, bounded matching and malformed masks. These are pure route decisions; actual protected native/procedure invocation remains unsupported and has zero effects, including a matching mask. A real DTQL query denied by an empty route allow-list executes no query; removing that narrowing policy restores the baseline. Each lower owner repeats route admission, so an upper allow cannot bypass a lower class denial.
+
+| Vector group | Exact additional assertions | Owner |
+|---|---|---|
+| V01 identity | Same ID user vs application/service/agent and realm A vs B cannot cross-match users; nonhuman currentUser indeterminate; explicit role binding works only after trusted realm resolution; stable bootstrap identity across restart | WP2/WP5 |
+| V02 predicates | Missing != null; null==null; missing never matches; `In` scalar membership; finite numeric comparisons with no string coercion; incompatible type error; UTF-8 ordering; exact integer boundary; captured path variable and nested fields | WP1/WP2/WP3 |
+| V03 evidence | Read-denied embedded row can be evaluated through registered private session with no public Get; retained/foreign session token rejects; redacted field is not absent; authorized absence and null differ; all evidence paths/revision same image | WP3/WP4/WP5/WP6 |
+| V04 batches | Duplicate normalized targets reject before reads/writes; different aliases of same key duplicate; per-item stale revision rolls back every item; deny in last item performs zero writes; two dry-run items are independent | WP3/WP4/WP5 |
+| V05 recovery | Process kill before/after each generation/HEAD/activation step; restart yields exactly committed old/new complete policy; no partial/no-policy admission; invalid committed generation fails closed | WP4a/WP5a/WP6 |
+| V06 disclosure | References-only and policy-admin-only cannot reveal unreadable-row existence; protected-key grant allows only facts for granted key; private metadata stays hidden; missing/denied ordinary HTTP and dry-run shapes equal; field evidence cannot declassify | WP5/WP6 |
+| V07 response | Sample operation IDs map to template; zero/all-allow samples conditional; partial sample indeterminate unless denial; every reference resolves; restriction variant fields exact; dry-run enforced=false; no private policy cardinality | WP1/WP5/WP7 |
+| V08 limits/schema | 1001 query rows, offset10001, >8MiB, elapsed10s or lockwait exhausted yields bounded failure/no partial success; schema hides unreadable fields; DDL rejects even for policy admin; no post-commit retry promise | WP3/WP4/WP5 |
+
+## Explicit mission proof map
+
+| # | Required proof | Test evidence |
+|---|---|---|
+| 1 | Every layer independently enforces | T03 direct owner/core paths |
+| 2 | Higher layer cannot bypass lower deny | T03, T20 |
+| 3 | Deterministic composition | T04 + V01/V02 |
+| 4 | DataTug discovers layers/provenance | T05/T06 |
+| 5 | Authorized policy editing | T05 real owner CRUD |
+| 6 | Noneditable policies represented | T06 custom pure provider |
+| 7 | Explain specific paths | T01 inspect + T07 |
+| 8 | Real query matches Explain | T01 with fixed revisions |
+| 9 | Real write matches Explain | T02 stored bytes/Git commit |
+| 10 | Multiple independent blockers | T07 one response |
+| 11 | Blockers retain owner/policy provenance | T07 enhanced grants + T09 redaction |
+| 12 | Bypass DataTug respects lower policies | T03 direct HTTP and adapter |
+| 13 | Edits persist after reload/reconnect | T05 + T14/V05 crash recovery |
+
+## Final review regression additions
+
+- Lifecycle: plan never enters evidence coordinator; inspection cannot acquire an execution session; retained/nested session token fails after lifetime; ACL-enabled dynamic transaction worker is rejected before any worker statement; legacy profile worker behavior remains unchanged.
+- Sample selection: field/route denial before rows emits a template-domain blocker, zero operations/count and deny; unavailable selection is indeterminate; template s1 allocates first row s2; lower IDs remap consistently.
+- Revisions: editing only a private policy leaves public policy ETag stable and never introduces a non-admin layer revision; concurrent public PUT preserves the private change.
+- Storage: identical valid generation is reused; invalid same-name generation rejects; no returned-error-only test substitutes for process kills.
+- Types/parsers: numeric Unix-millisecond now; list-valued parameter only In; strict query/sample aliases, tags, duplicate keys, depth/node/body bounds.
+- Field evidence: request/response resource.columns rejected, exact requiredFields covered; parent under possible child exclusion rejects both when child exists and when absent.
+
+T21's complete definition and owner matrix are in [18-mask-supplement.md](18-mask-supplement.md); it is a mandatory part of this acceptance plan.
