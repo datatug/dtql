@@ -1,0 +1,100 @@
+[
+  {
+    "repo": "datatug/dtql",
+    "head": "69f7a1a144d2563a5f85ee80f95881a5e13b4082",
+    "branch": "main",
+    "origin": "https://github.com/datatug/dtql.git",
+    "status": ""
+  },
+  {
+    "repo": "datatug/dtql-go",
+    "head": "e20e20322f90ff809cd0e1b2fc95641ca7e1f870",
+    "branch": "main",
+    "origin": "https://github.com/datatug/dtql-go.git",
+    "status": ""
+  },
+  {
+    "repo": "dal-go/dalgo",
+    "head": "6b0be09b95bd3afc90309763671791e17264dffe",
+    "branch": "main",
+    "origin": "https://github.com/dal-go/dalgo.git",
+    "status": ""
+  },
+  {
+    "repo": "dal-go/dalgo4auth",
+    "head": "068f962057ca96f051abd461438d92e169ae5e07",
+    "branch": "main",
+    "origin": "https://github.com/dal-go/dalgo4auth.git",
+    "status": ""
+  },
+  {
+    "repo": "ingitdb/ingitdb-go",
+    "head": "95a40667759cc86e88e1b6714070584e0e794c08",
+    "branch": "main",
+    "origin": "https://github.com/ingitdb/ingitdb-go.git",
+    "status": ""
+  },
+  {
+    "repo": "ingitdb/dalgo2ingitdb",
+    "head": "7a6a2a5d3bfb179919ed081c2a6db6305d030bba",
+    "branch": "main",
+    "origin": "https://github.com/ingitdb/dalgo2ingitdb.git",
+    "status": ""
+  },
+  {
+    "repo": "ingitdb/ingitdb-cli",
+    "head": "ac1ec35accb05ea491a647a84b6c32f349bd4503",
+    "branch": "main",
+    "origin": "https://github.com/ingitdb/ingitdb-cli.git",
+    "status": ""
+  },
+  {
+    "repo": "ingitdb/ingitdb-specs",
+    "head": "01c249c2503fa372ee747bae784d69556ef36d96",
+    "branch": "main",
+    "origin": "https://github.com/ingitdb/ingitdb-specs.git",
+    "status": ""
+  },
+  {
+    "repo": "openvaultdb/openvaultdb",
+    "head": "ea9858d78b4c4c8151af0972741ea520dc581190",
+    "branch": "main",
+    "origin": "https://github.com/openvaultdb/openvaultdb.git",
+    "status": ""
+  },
+  {
+    "repo": "openvaultdb/openvaultdb-go",
+    "head": "3317ee519f4e8ff5240caa54e5e9b20c011525e2",
+    "branch": "main",
+    "origin": "https://github.com/openvaultdb/openvaultdb-go.git",
+    "status": ""
+  },
+  {
+    "repo": "openvaultdb-org/openvaultdb-go",
+    "head": "21ab0e2fd0b83ca4816b1b8a470793783a103c57",
+    "branch": "main",
+    "origin": "https://github.com/openvaultdb/openvaultdb-go.git",
+    "status": ""
+  },
+  {
+    "repo": "dal-go/dalgo2openvaultdb",
+    "head": "6038ad534b9d77e4213233857a6387cc0c34fa34",
+    "branch": "main",
+    "origin": "https://github.com/dal-go/dalgo2openvaultdb.git",
+    "status": ""
+  },
+  {
+    "repo": "datatug/datatug-cli",
+    "head": "a913de4fd6455e35d2cf9b4f54c4bb5ed36bb4fe",
+    "branch": "main",
+    "origin": "https://github.com/datatug/datatug-cli.git",
+    "status": ""
+  },
+  {
+    "repo": "datatug/datatug-apps",
+    "head": "38155e6e7e7870c3a21665f997812d623b88f1c2",
+    "branch": "main",
+    "origin": "https://github.com/datatug/datatug-apps.git",
+    "status": ""
+  }
+]

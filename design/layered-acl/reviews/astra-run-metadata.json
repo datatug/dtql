@@ -1,0 +1,18 @@
+{
+  "model": "gpt-6-astra",
+  "startedAt": "2026-09-08T13:39:06.565Z",
+  "endedAt": "2026-09-08T13:46:19.629Z",
+  "elapsedSeconds": 433.064,
+  "usage": {
+    "input_tokens": 461622,
+    "cached_input_tokens": 403584,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 8132,
+    "reasoning_output_tokens": 4879,
+    "total_tokens": 469754
+  },
+  "reportedCostUSD": null,
+  "costReason": "No cost field exposed in Codex session telemetry; no price assumption used.",
+  "source": "Codex session event_msg token_count cumulative total_token_usage; session 01a0813e-6a8b-76b0-9994-925611c348c9",
+  "tokenDefinition": "Cumulative input includes repeated input across turns and cached input. Output includes reasoning tokens; do not add reasoning again."
+}

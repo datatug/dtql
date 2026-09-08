@@ -1,0 +1,27 @@
+{
+  "models": [
+    {
+      "model": "claude-haiku-4-5-20251001",
+      "uncachedInput": 44474,
+      "cacheReadInput": 0,
+      "cacheCreationInput": 0,
+      "allInput": 44474,
+      "output": 16,
+      "reportedListCostUSD": 0.044553999999999996
+    },
+    {
+      "model": "claude-opus-5",
+      "uncachedInput": 2,
+      "cacheReadInput": 0,
+      "cacheCreationInput": 63256,
+      "allInput": 63258,
+      "output": 40869,
+      "reportedListCostUSD": 1.654295
+    }
+  ],
+  "allInput": 107732,
+  "allOutput": 40885,
+  "total": 148617,
+  "reportedListCostUSD": 1.698849,
+  "note": "Input categories summed once. Output includes thinking; do not add thinking again. Total includes tool-reported ancillary Haiku usage. Reported list-price cost is not a verified subscription invoice."
+}

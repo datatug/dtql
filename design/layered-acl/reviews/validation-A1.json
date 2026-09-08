@@ -1,0 +1,12 @@
+{
+  "checkedAt": "2026-09-08T13:39:49.248411+00:00",
+  "localLinkFailures": [],
+  "frozenManifestMismatches": [],
+  "requiredDesignDocuments": 14,
+  "baselineTests": {
+    "command": "wb run -- go test ./access ./dtql ./condeval",
+    "repo": "dal-go/dalgo",
+    "result": "passed"
+  },
+  "mvpImplemented": false
+}

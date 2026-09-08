@@ -1,0 +1,78 @@
+{
+  "revision": "A1",
+  "frozenAt": "2026-09-08T13:38:52.554588+00:00",
+  "files": [
+    {
+      "path": "README.md",
+      "sha256": "5d30c9f2e5ffd0e610b74ec2af8bc5df3742af78820596cd524fc68035332933"
+    },
+    {
+      "path": "01-current-state.md",
+      "sha256": "e5b85c83b2bb8f254bbb6da65f1125670ff642f7d2cb02b94546c550962e496a"
+    },
+    {
+      "path": "02-architecture.md",
+      "sha256": "0624cda66f7937498e39571bd35c124726cf790ecc4fa931e2703bb7f4c53fd3"
+    },
+    {
+      "path": "03-policy-format.md",
+      "sha256": "0630242aedab9e81fb3ff34ed5122e3063ff463ebe94be18f9bb98272c4b656b"
+    },
+    {
+      "path": "04-authorization-contract.md",
+      "sha256": "977bb55eab15eadb6a2f02754ca9593e3fb206ae6e90640ded63925ff7bcf880"
+    },
+    {
+      "path": "05-dalgo.md",
+      "sha256": "85570e8457713d694e5927bc87132ec5d3f1f043cd94dddf723ebbe3e3f292c4"
+    },
+    {
+      "path": "06-identity.md",
+      "sha256": "b067929d6abd19e053db138ccd3c9039664496621ca5334e7952908fb52300de"
+    },
+    {
+      "path": "07-ingitdb.md",
+      "sha256": "cb0a53cd2c7901e3c3a1c6df3b9cda6149de05741194edf8e034f587fc1aed13"
+    },
+    {
+      "path": "08-openvaultdb.md",
+      "sha256": "b520d6229e1befcb42c5292f1e25d2d3fcafdfbb3c863090407a3baf998093d5"
+    },
+    {
+      "path": "09-datatug.md",
+      "sha256": "6c1bc395a06b737ff80dfc65c1c3be9ea38e1396e74375043169bc86b5aefb93"
+    },
+    {
+      "path": "10-security.md",
+      "sha256": "c9223d079cbdcc53d8e4f8f5abce30687f37ec31450bad536eb37d38c47e595e"
+    },
+    {
+      "path": "11-acceptance.md",
+      "sha256": "d0b78cdad4b5c5f0272f0482d3be53c66ca785ae31f5facde83f1d75ee05da71"
+    },
+    {
+      "path": "12-work-packages.md",
+      "sha256": "f37929af64a122c583b33552f0cd68a116d727ab6998ea524514d813c5dfa36b"
+    },
+    {
+      "path": "13-decisions.md",
+      "sha256": "c681ac2b225269ba2baa078bcceb2c91793bf956a505915c9d890fab38901e5b"
+    },
+    {
+      "path": "14-future.md",
+      "sha256": "7384703d098328884362cd97feb4543d94d1e2e6da771cd5ccf662e422cd2660"
+    },
+    {
+      "path": "audit-snapshots.json",
+      "sha256": "9a0a6001a569a9db2030eef8bcc29a8d96d737c8400ade70b53b505e3df90fa4"
+    },
+    {
+      "path": "reviews/rubric.md",
+      "sha256": "01b874368ffd3db95fb9c8c5d34862d70a29e10ba92c62342fe74251581adacb"
+    },
+    {
+      "path": "reviews/source-evidence.md",
+      "sha256": "c88f2459f7cb660762d5fe973dfa241071baf1f8aaed2fa6aea460850cee2348"
+    }
+  ]
+}

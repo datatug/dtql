@@ -1,0 +1,1954 @@
+Review this frozen design packet independently using the included rubric. Do not implement or read another review. Return the required review report.
+
+
+
+===== FILE README.md =====
+
+# Layered ACL MVP — design review packet
+
+Status: proposed contracts, awaiting independent review and human sign-off. Design only; no MVP implementation is authorized by this packet. Author: Astra A, 2026-09-08.
+
+DTQL owns the portable policy and authorization wire specifications. DALgo evolves its existing `access`, `dtql`, and `condeval` implementation. InGitDB, OpenVaultDB, and the DataTug daemon enforce their own policy sets. The browser displays and administers authorized policy surfaces; it is never an enforcement boundary.
+
+The MVP is a real DataTug browser → DataTug daemon → OpenVaultDB HTTP → embedded InGitDB adapter vertical slice, with persisted policies at all three owners, a protected structured query and key-targeted UPDATE, multiple blockers, and Explain Access. It does not recreate InGitDB's removed HTTP server or turn the read-only query builder into a SQL mutation console.
+
+## Reading order and deliverables
+
+| Document | Purpose |
+|---|---|
+| [01-current-state.md](01-current-state.md) | Evidence, reusable code, discrepancies, gaps, baseline validation |
+| [02-architecture.md](02-architecture.md) | Boundaries, composition, execution and race handling |
+| [03-policy-format.md](03-policy-format.md) | Proposed DTQL policy document and normative semantics |
+| [04-authorization-contract.md](04-authorization-contract.md) | Wire types, taxonomy, management and Explain contracts |
+| [05-dalgo.md](05-dalgo.md) | Additive evaluator, enforcement and provider interfaces |
+| [06-identity.md](06-identity.md) | Stable identities, bindings, actors, trusted propagation |
+| [07-ingitdb.md](07-ingitdb.md) | Authoritative storage and adapter integration |
+| [08-openvaultdb.md](08-openvaultdb.md) | Mounts, transport, composition and arbitrary sources |
+| [09-datatug.md](09-datatug.md) | Daemon enforcement, policy UX and Explain Access |
+| [10-security.md](10-security.md) | Threat model, diagnostic disclosure, administration |
+| [11-acceptance.md](11-acceptance.md) | Fixtures, expected results, E2E and negative tests |
+| [12-work-packages.md](12-work-packages.md) | Dependencies, contracts, tasks, tests and handoff gates |
+| [13-decisions.md](13-decisions.md) | Alternatives, recommendations and human decisions |
+| [14-future.md](14-future.md) | Bounded transaction compatibility and custom-provider seam |
+| [reviews/rubric.md](reviews/rubric.md) | Identical independent review instructions and metrics |
+| [audit-snapshots.json](audit-snapshots.json) | Exact local repository revisions audited |
+
+Normative MUST/SHOULD language describes proposed implementation obligations, not current behavior. Shared contract names are candidates until the human checkpoint. Examples are specification fixtures, not installed policies. This packet lives together in the standalone DTQL repository to give both reviewers identical cross-repository material. Owner-repository document updates and links are explicit work packages, not a claim that those repositories already adopted this design.
+
+## Approval boundaries
+
+Before parallel implementation, approve C1 policy semantics/version, C2 decision/request/admin wire shapes, C3 principal trust profile, C4 provider and enforcement capabilities, C5 mutation revision contract, and C6 supported query/write subset. See the decision log. Existing supported DALgo behavior remains under its existing version; new stricter behavior is negotiated through the DTQL ACL profile.
+
+The independent reviews must use the same packet digest and rubric without access to each other's findings. A separate reconciler classifies findings and produces the human decision report and cost/value comparison. Design approval and permission to dispatch implementation are separate; this phase stops for human sign-off.
+
+
+===== FILE 01-current-state.md =====
+
+# Current-state audit
+
+Audit date: 2026-09-08. Evidence is from the clean local revisions in [audit-snapshots.json](audit-snapshots.json), not a claim that every local clone is the latest remote release. DTQL's isolated branch was created from fetched `origin/main`. All paths below are relative to the named repository; inspect them at its recorded SHA. Tests were inspected as well as implementation. No MVP code was changed.
+
+## Repository and evidence map
+
+| Repository | Evidence inspected | Reuse and limits |
+|---|---|---|
+| `datatug/dtql`, `datatug/dtql-go` | Root READMEs | Specification/toolkit aspirations; essentially placeholders. No competing mature policy parser found here. |
+| `dal-go/dalgo` | `docs/access-policies.md`; `spec/features/access-policies/{README.md,row-level-conditions/README.md,principal-bindings/README.md,field-patterns/README.md}`; `access/*.go` | Existing hierarchical capability model, YAML/JSON codecs, default deny, principal rule-set bindings, row predicates, post-image checks, field allow-lists, secured DB/session wrappers. Evolve this. |
+| `dal-go/dalgo` DTQL | `dtql/{shapes.go,serialize.go,deserialize.go,query.go,schema.go}`, `dtql/examples/comparison.dtql.yaml`, `spec/plans/2026-06-05-dtql.md` | Working query interchange uses YAML `from`, `columns`, `where`, `orderBy`, `limit`, `offset`; typed expression nodes `field/value/values/param`, comparisons and `and/or`. A bounded structured-query subset, not a mutation language. Schema/conformance/publication already exist. |
+| `dal-go/dalgo4auth` | README and file inventory | Placeholder, not an identity infrastructure implementation to build upon. |
+| `ingitdb/ingitdb-go` | `ingitdb/config/root_config.go`, `ingitdb/collection_def.go`, README, feature inventory | Schema/configuration/validation package; no runtime DALgo policy ownership found in this inspected surface. |
+| `ingitdb/dalgo2ingitdb` | `database.go`, `tx_readwrite.go`, `query.go`, `filelock.go`, `git_commit.go`, CRUD/conformance/file-lock tests | Actual current local adapter. CRUD and query, shared/exclusive cooperating-writer lock, rollback journal, optional Git commit. No `access.SecureDB`/policy loading found. Constructor returns `dal.DB`, useful for secured-handle evolution. |
+| `ingitdb/ingitdb-cli` | AGENTS, `server/README.md`, `docs/adr/0001-remove-serve-command.md` reference | Server/API/auth/MCP gateway deliberately removed; old AGENTS package references are stale. Do not resurrect server as a prerequisite. |
+| `ingitdb/ingitdb-specs` | `docs/schema/root-config.md`, GitHub app/PR permission specs, proposal inventory | Repository/PR permissions and GitHub credentials are distinct from per-record runtime ACL. Some docs still describe removed server/MCP functionality. |
+| `openvaultdb/openvaultdb` | `spec/api/auth.md`, `spec/decisions/0004-sneat-co-identity-and-space-principals.md` | Approved hosted identity uses verified shared Sneat Firebase UID directly; current membership resolution and separate application capabilities are required. General auth spec also includes unimplemented aspirations. |
+| `openvaultdb/openvaultdb-go` | `pkg/auth/{auth.go,middleware.go,store.go}` and tests; `pkg/server/{dtql.go,records.go,httperr.go,connect.go}`; `pkg/core/{core.go,query.go}`; `pkg/mount/mount.go`; README, architecture/threat-model docs | Real HTTP bearer capability auth, hashed token persistence, owner bypass, collection grants, `/query`, `/dtql`, record PATCH and batch writes. Mounts DALgo InGitDB/SQL/Firestore drivers. No row/field ACL composition at mount found. Current errors contain code/message and raw errors, no structured ACL envelope. |
+| `openvaultdb-org/openvaultdb-go` | origin, SHA, go.mod, matching server/auth files | Older clone of the **same** `github.com/openvaultdb/openvaultdb-go` origin. Do not treat it as a separate service or implement twice. Current chosen clone pins DALgo v0.64.4; older clone pins v0.62.10. |
+| `dal-go/dalgo2openvaultdb` | driver and driver tests, README contract | HTTP adapter and buffered writes, not a remote transaction that makes pre-image reads atomic. Must add a revision precondition for upper-layer conditional writes. |
+| `datatug/datatug-cli` | `pkg/accesspolicies/{dir.go,run.go,explain.go,fields.go,accesspolicies_test.go}`, `apps/datatugapp/commands/cmd_query.go` | Already loads YAML/JSON from `~/.datatug/policies` or flags; `DecodePolicy`; principal/variable options; secured read session and explanations. No policies errors unless explicit `--no-policies`. Strong reuse candidate, not a greenfield ACL UI backend. |
+| `datatug/datatug-cli` server | `pkg/server/endpoints/{routes.go,execute_endpoints.go}`, `pkg/api/execute_select_api.go`, `spec/features/serve-brokered-query-builder/README.md` | Existing HTTP query execution and read-only builder specification. Legacy select handler uses `context.Background()`, dropping request cancellation/principal context. CLI principal flags are trusted local simulation, not HTTP authentication. |
+| `datatug/datatug-apps` | AGENTS, package.json, `libs/datatug/main/src/lib/queries/query-context-sql.service.ts`, `.../services/unsorted/recordset.service.ts`, related tests | Angular/Ionic/Nx, shared Sneat auth/Firebase dependencies, query UI and SQL convenience parser. Empty RecordsetService and incomplete helpers caution against assuming a full edit pipeline. Client SQL parsing is not security analysis. New UI should follow signals/OnPush conventions. |
+
+## Exact DALgo semantics to preserve
+
+`access/operation.go` separates `get`, `exists`, `query`, `insert`, `set`, `update`, `delete`, reserved `truncate`. `read/write/readwrite` expand to groups; write does not imply read.
+
+`access/policy.go:matchingRules` sorts by path depth, literal specificity, restrictive effect, then rule name. A deeper allow can reopen a parent deny **inside one policy**. Independent database, bound-context and request policies intersect. `PrincipalPolicySet` unions the rule sets selected by user, roles, groups and everyone into **one** policy, then joins that intersection. Role bindings do not each become independent default-deny policies.
+
+`access/document.go` uses `apiVersion: dalgo.io/access/v1`, `kind: AccessPolicy`, `metadata.name`, `default`, and either `scopes` or `ruleSets` plus `bindings`. Conditions already use DTQL expression shapes. Only allow rules support `where/check/fields`. `check` defaults to `where`. Read row alternatives become a disjunction; writes choose the first applicable alternative, with post-image and field checks. Query field sets conservatively intersect alternatives; this is stricter than per-row field selection. Custom `Policy` values already exist; some cannot be serialized.
+
+`access/context.go:authorizeRequest`, `AccessPolicy.Decide`, `condition.go:matchResiduals`, and `write.go:enforceWrites` stop at the first failure. `Decision.Allowed=true` may mean **residual obligations remain**, not completed authorization. `DeniedError` is singular with English explanation and source text. The existing error must never be copied straight into a public API.
+
+`access/condition.go:rewriteQuery` ANDs base-table predicates before execution/paging and refuses conditional joins. The wrapper's internal write pre-image read needs a `dal.ReadSession`, not necessarily a caller's public get permission; nested secured remote wrappers complicate that distinction. `access/session.go` wraps query readers for field redaction; a schema-complete post-filter verification guarantee is not established merely by the docs.
+
+## Important gaps and discrepancies
+
+1. DALgo docs still call predicates/projections future constraints although code and tests implement them. Feature status/prose also trails code (for example “nothing evaluates ... today”). Correct documentation in the owner work package.
+2. DataTug already supplies hidden-field query-reference checks and rejects aliases under field restrictions. These checks belong in reusable DALgo enforcement for the protected profile; duplicating them in every UI would leave bypasses.
+3. DataTug Explain derives attribution by splitting English `Explanation` on ` via ` and prints supplied variable values. Replace with structured provenance and disclosure projection, preserving the existing local CLI compatibility separately.
+4. OpenVaultDB README/threat model contains both “no auth” and later implemented auth sections; comments in DTQL handlers still say future authentication. `/dtql` currently requires an unscoped read capability because target analysis happens later in core.
+5. No discovered owner CRUD/discovery/Explain protocol, complete blockers, stable layer manifests, or safe remote pre-image revision contract. These are enabling work, not solved by simply stacking `SecureDB`.
+6. Owner-token full capability access currently has no data ACL beneath it. New ACL-enabled mounts must explicitly prevent this token bypassing database policies.
+7. Direct filesystem/Git access and unwrapped adapter handles bypass in-process controls. This is a threat-boundary fact, not something a policy document can repair.
+
+## Validation and confidence
+
+Executed `wb run -- go test ./access ./dtql ./condeval` in DALgo: **all passed** (access 0.018s, dtql 0.180s, condeval 0.003s; runner 11s). Initial sandbox attempt failed on the Go cache and was retried with approved access. Existing named tests inspected include `TestPrincipalPolicySetIntersection`, `TestConditionalQueriesThroughStub`, `TestConditionalWriteNeedsReadCapability`, `TestFieldsThroughStub`, `TestConditionalWritesThroughStub`, and codec/round-trip tests. Passing these is baseline evidence, not evidence that the proposed MVP works.
+
+Nx inventory initially could not reach npm; local source was inspected without installing dependencies. No frontend build or cross-repo E2E was run in this design phase. No baseline claims are made for unexecuted suites. Implementation must re-pin current provider/consumer versions and run compatibility tests before using these source-level conclusions as release evidence.
+
+
+===== FILE 02-architecture.md =====
+
+# Architecture and enforcement boundaries
+
+## Ownership
+
+```text
+Browser: DataTug policy UI, query UI, structured record editor
+  │ authenticated request; no caller-supplied authoritative roles
+DataTug daemon: owned policies + application restrictions + token boundary
+  │ OpenVaultDB HTTP, authenticated subject and actor, conditional writes
+OpenVaultDB: capability grants + owned policies + adapter routing
+  │ in-process, immutable verified principal context
+InGitDB public DALgo adapter: DB-owned policies + storage transaction
+  │ unexported enforcement access to pre/post images
+Git-backed data and policy files
+```
+
+DTQL specifies values, semantics and transport contracts. DALgo implements reusable parsing, evaluation, query restrictions and write checks. Policy stores and authenticators are host-owned. DataTug's browser may hide a disabled button but only the daemon's secured path enforces its policies. A user accessing OpenVaultDB directly skips DataTug's own optional restrictions, but must still encounter OpenVaultDB and InGitDB restrictions. Do not claim that DataTug policies govern independent lower-layer clients.
+
+The InGitDB owner is a library/adapter boundary in this MVP, not another HTTP process. OpenVaultDB cannot choose not to load its policy manifest. InGitDB's public constructor must load/validate the DB owner policy set and return a secured handle. Raw storage handles are private to trusted adapter enforcement code. Hostile Go code, repository owners and filesystem administrators are outside the in-process ACL threat boundary.
+
+## Deterministic combination
+
+For a complete concrete request `r`, `permit(r) = authenticated-and-capable(r) AND every required enabled policy permits(r) AND every obligation is enforced(r)`. A missing/failed/unknown required participant never counts as allow. Within each policy, retain DALgo hierarchy and principal binding semantics described in the policy format. Independent policies/layers intersect. There is no priority field allowing an upper policy to override a lower policy.
+
+| Condition | Required behavior |
+|---|---|
+| Explicitly ACL-disabled owner scope | Preserve legacy access behavior and existing authentication gates; report `disabled`, not affirmative ACL allow. |
+| Enabled scope with zero policies, missing manifest, incomplete configuration | Deny via `ACL_CONFIGURATION_INVALID`. Do not infer disabled from missing files. |
+| Policy with no matching allow, including no subject binding | Deny via `ACL_NO_MATCH`; attribute policy, never silently skip it. |
+| Multiple subject matches | Union selected rule sets inside one policy, deterministic DALgo rule precedence. |
+| Multiple mandatory policies | Intersection; all applicable independent blockers collected. |
+| Parent and child scopes | Existing descendant matching; more-specific rule wins inside one policy. Inherited mandatory policies are never removed by child configuration. |
+| Evaluation/type/parameter error | No execution; `indeterminate`, or `deny` if another definitive denial exists. Error blocker records safe facts. |
+| Required source unavailable or lacks necessary enforcement | No execution. Source unavailable or unsupported reason; visible partial coverage. |
+| Unrecognized data operation, policy version or required contract field | Reject; no interpretation as a legacy unrestricted request. |
+
+Enabled scope is **the database in MVP**. Table selection is inside policies, not a separately toggleable ACL scope. Child tables do not inherit an implicit allow. Runtime requests cannot set ACL mode, remove required owners, or supply mandatory policies. Admin can disable only through a distinct configuration privilege, outside normal policy DELETE.
+
+## Request lifecycle
+
+1. Authenticate ingress, resolve subject plus actor and current membership, validate token capabilities. Bind immutable principal and trusted variables. Separate query parameters from authorization variables.
+2. Normalize the operation once: exact mounted database identity, canonical paths, explicit target fields, structured query or typed mutation. Reject unsupported forms before data access. Discover the required participant topology from server configuration, not browser claims.
+3. Pin each owner's immutable policy snapshot/revision for the short operation. Build a DALgo evaluation plan with residual row and field obligations. `conditional` is not final permission.
+4. Evaluate every available independent policy and field/operation blocker, even after a denial. Evaluate row-dependent obligations only using authorized enforcement evidence. No mutation may be used to “probe” a lower layer. Bounds are specified in the wire contract.
+5. If all required obligations can be met, execute through the secured owner handles. Queries carry intersected row filters into the engine **before limit/order/paging**. Writes verify actual pre- and post-images at the mutation boundary. Denied write: no delegated mutation and no Git commit.
+6. Reduce decisions, redact for the caller, and return provenance, snapshot IDs, coverage and restrictions. Execution and public Explain call the same normalization and evaluator. Explain never authorizes a later operation.
+
+## Reads
+
+MVP: single root collection, field projection, comparisons `==`, `In`, `>`, `>=`, `<`, `<=`, `and/or`, literal RHS or bound parameters, field order and bounded limit/offset. No joins, aggregates, functions, aliases, native SQL, dynamic identifiers, computed-field dependency inference or collection-group queries on ACL-enabled mounts. Reject unsupported paths even if a legacy opaque-query rule allows them. This is an explicitly stricter negotiated profile; legacy DALgo can retain its separate opaque capability behavior.
+
+Row rules filter query results, so `query` may succeed with zero visible rows. That is not a list of denied hidden rows. A concrete `get`/`exists` can deny; protected and nonexistent paths must have the same public missing/denied projection where disclosure is disallowed. `query` and `get` are separate operations and Explain must not confuse them.
+
+Field restrictions apply to explicit selection, filters, sorts and other caller references, not just result cells. A hidden field cannot become an inference channel through `WHERE hidden = ...`. Wildcard result selection is safely intersected/redacted. Explicit forbidden fields reject the request in this profile. Trusted policy predicates may refer to hidden fields inside the **owning enforcement component**; no such raw value is returned to the caller. Query alternatives use the current conservative DALgo intersection of possible field lists. The UI labels this; it must not display their union as effective access.
+
+Each upstream row constraint is ANDed into the outgoing structured query before paging. Sending a constraint cannot grant lower-layer access. If an upstream predicate needs a field the downstream interface refuses, the adapter reports unsupported enforcement and fails closed; it must not fetch unprotected data or paginate then filter. The fixture avoids this by keeping country/status available for permitted rows.
+
+## Writes and race safety
+
+All operations use one typed mutation model. MVP proves key-targeted `update` with field-set assignments; insert/set/delete are specified and receive contract/adapter tests. UPDATE-by-arbitrary-WHERE, SQL mutation parsing and multi-row mutation UI are follow-up. `set` is replacement/upsert, never mapped to update; removed fields as well as added/changed fields are authorization targets. Insert checks the candidate post-image; update checks pre-image `where` plus post-image `check`; delete checks pre-image and no post-image. An update naming a forbidden field is denied even if it would set the same value.
+
+At InGitDB and embedded OpenVaultDB, trusted pre-image reads and enforcement must occur within the existing short storage transaction. Policy reload/policy CRUD participates in the owner's snapshot admission barrier. Each operation sees one immutable policy revision; successful edits affect operations admitted afterwards. No long-running transaction protocol is added.
+
+Across DataTug → OpenVaultDB HTTP, the current buffered DALgo driver does **not** make a prior read atomic with a later batch. For a row-dependent DataTug write, require a revision-bearing authorized point read and a mutation `ifDataRevision` checked under the OpenVaultDB/InGitDB transaction lock. The revision is owner-issued and covers the **whole record**, not only visible fields; it is not a client content hash. The candidate post-image is computed from that same evidence. If hidden fields needed by DataTug are unavailable, conditional writing is unsupported and fails closed. Internal InGitDB checks do not require granting public read authority, but the MVP remote DataTug conditional-write profile does require such evidence. Write-only unconditional grants remain possible.
+
+DataTug pins its policy/principal snapshot through the outgoing request and response. OpenVaultDB independently pins its snapshot, reauthenticates, and InGitDB evaluates current owner policy at execution admission. A data-revision mismatch returns 409 `DATA_REVISION_CONFLICT`, performs no mutation and requires re-read/re-evaluation; do not retry using the old decision. A previous Explain revision is advisory, not an access token. Policy edits changing lower policy between Explain and execution are naturally rechecked. This is per-owner short-operation snapshot semantics, not a globally simultaneous policy snapshot or distributed ACID guarantee.
+
+Triggers, generated fields or schema transformations affecting security fields must run before the final post-image ACL check, within the same short transaction. If the provider cannot expose the final candidate or demonstrate equivalent atomic checks, advertise the operation unsupported. MVP fixtures contain none of these transformations.
+
+## Collecting blockers without unsafe execution
+
+Provide an internal read-only authorization inspection path behind the same authentication and disclosure checks. OpenVaultDB invokes its own and embedded InGitDB evaluation against one safe evidence snapshot. DataTug invokes it even when DataTug has a static column denial, then appends DataTug decisions. Sending a denied mutation for execution is forbidden.
+
+A regular authenticated data caller may invoke self-inspection only for the same bounded resources/operation they could submit; the response uses ordinary diagnostic redaction. Enhanced Explain and another-principal simulation require separate privileges. An upper component is not automatically entitled to lower-layer raw images or detailed reasons. For the E2E diagnostic identity, explicitly grant safe policy-reference diagnostics at each owner. InGitDB may evaluate a row it refuses to reveal and return its row blocker; upper row evaluation can remain unevaluated while upper static column blockers are still returned. Known denial remains definitive despite partial coverage.
+
+Coverage distinguishes evaluated facts, redacted facts, deferred row predicates, unavailable evidence, and bounded truncation. “All blockers” means all independent blockers safely evaluable within advertised limits, never all hidden rows in a query or all unreachable services. There is no global search for a minimal unsatisfied policy set. A losing allow/deny rule within one policy's precedence is not an independent blocker.
+
+
+===== FILE 03-policy-format.md =====
+
+# DTQL ACL policy format and semantics — proposed v1
+
+Contract C1. Proposed `apiVersion: dtql.org/access/v1`; this identifier is a version discriminator, not a claim that a public schema URL is already deployed. DTQL owns this portable contract; DALgo supplies its first conforming implementation. `dalgo.io/access/v1` remains accepted by existing legacy decoders. Do not silently reinterpret or rewrite legacy documents.
+
+## Reuse and representation
+
+Canonical editable text is UTF-8 YAML 1.2 in its JSON-compatible subset; JSON represents the same abstract document. This adopts DALgo's existing document and condition shape rather than creating a policy DSL. The first portable profile supports existing hierarchical allow/deny, row `where/check`, field **allow-lists**, and principal bindings. A UI “deny column” action produces an explicit allowed-field restriction in a separate policy against the current schema; it never invents a `deny fields` rule that DALgo cannot execute. New fields stay denied by that explicit list. Predicate-bearing deny rules are unsupported in this profile; represent positive admissible rows rather than introducing negation semantics.
+
+```yaml
+apiVersion: dtql.org/access/v1
+kind: AccessPolicy
+metadata:
+  name: tenant-access
+  visibility: private
+target:
+  database: crm
+composition: dalgo-hierarchical-v1
+default: deny
+ruleSets:
+  editor:
+    - path: /customers
+      rules:
+        - id: read-tenant
+          effect: allow
+          operations: [get, exists, query]
+          where:
+            op: "=="
+            left: {field: tenant}
+            right: {param: tenant}
+        - id: update-tenant
+          effect: allow
+          operations: [update]
+          where:
+            op: "=="
+            left: {field: tenant}
+            right: {param: tenant}
+bindings:
+  users:
+    user-alice: [editor]
+  roles:
+    crm-editor: [editor]
+  groups:
+    crm-team: [editor]
+```
+
+The example names an opaque user in the configured identity realm. Real deployment uses its established ID, not an OAuth subject or display name. `tenant` is a host-resolved trusted authorization attribute, never a query-supplied parameter. This policy denies operations not explicitly granted; a fixture requiring other operations supplies corresponding rules.
+
+## Document grammar
+
+All maps reject unknown keys. Keys are case-sensitive. Nonempty strings are bounded to 256 UTF-8 bytes unless otherwise specified. IDs use `[A-Za-z0-9][A-Za-z0-9._-]{0,127}` for policy/rule/rule-set IDs. Principal binding keys are opaque strings bounded to 256 bytes, interpreted within the owner's realm; they need not obey the policy ID grammar.
+
+| Field | Required type and meaning |
+|---|---|
+| `apiVersion` | Exact string `dtql.org/access/v1`. |
+| `kind` | Exact `AccessPolicy`; audit-selection policies remain separate and never authorize data. |
+| `metadata` | Object with required `name`, stable policy ID; optional `description` ≤2048 bytes, non-normative author text; optional `visibility: private|public`, default public. |
+| `target` | Object with required `database`: exact local owner database ID. No regex or wildcard in MVP. Mount aliases resolve server-side to the owner's database ID before evaluation. |
+| `composition` | Required exact `dalgo-hierarchical-v1`; unknown value rejects. Across documents composition is always intersection. |
+| `default` | Required exact `deny`. |
+| `scopes` | Nonempty scope array for a policy applying to every principal; mutually exclusive with `ruleSets/bindings`. |
+| `ruleSets` | Nonempty map of rule-set ID to nonempty scope array, required with `bindings`. |
+| `bindings` | Object with `users`, `roles`, `groups` maps to nonempty arrays of existing rule-set IDs, and optional `everyone` array. At least one binding required. Matched sets deduplicated. |
+
+A scope has exactly one selector `path` (string), `collectionGroup` (string), or `opaqueQuery: true`, plus nonempty `rules` and/or child `scopes`. MVP wire interchange can preserve the latter two legacy selectors, but the protected execution profile rejects them as unsupported. A disabled legacy source does not thereby gain the new profile's conformance claim.
+
+A rule has required `id`, `effect` (`allow` or `deny`), `operations` (nonempty array); optional `where`, `check`, `fields`. IDs are unique within a plain policy and within each rule set; the qualified rule ID is `ruleSet/rule` for bindings. `fields` is a nonempty array of patterns; absence means all fields, and explicit `[]` rejects to avoid omission/empty serialization ambiguity. `where/check/fields` are allowed only on `allow`. `check` without `where` constrains new data but not reads. Neither `where` nor `check` accepts explicit null.
+
+Leaf operations: `get`, `exists`, `query`, `insert`, `set`, `update`, `delete`, `truncate`. Authoring conveniences `read`, `write`, `readwrite` expand to the existing leaf sets. Conditional/field-restricted groups must canonicalize to explicit supported leaves and exclude truncate; explicit restricted truncate is invalid. New serializers emit explicit leaves in that order. Unknown operations reject. `truncate` is representable but not executable in MVP. CRUD on policy resources uses a separate administration action namespace, never these data grants.
+
+## Paths, fields, expressions
+
+Path selectors reuse DALgo alternating collection/record segments: `/customers`, `/customers/123`, `/spaces/{spaceID}/customers`. Scopes apply to descendants. Nested fragments append structurally; canonical output uses the same nested tree, not a semantic flattening. `*` and `{capture}` only occupy record-ID positions; `/**` is optional terminal inherited-subtree notation, not arbitrary glob syntax. Root `/` matches all logical resources. Only string record IDs are portable in this profile. IDs containing reserved separators use percent encoding decoded exactly once into structural segments; adapters must use the common normalizer, never filesystem string concatenation. Reject malformed encodings, empty segments, dot traversal, invalid wildcard placement and collisions after normalization. Preserve case; no Unicode/case-fold aliasing.
+
+Field names are dotted paths using DALgo's existing `fields` patterns (whole-segment `*`, permitted prefix/suffix wildcard forms). A concrete request uses field segment arrays on the wire, making nested `address.city` unambiguous. Literal dots in a segment, ambiguous pattern escapes and whole-object replacements under descendant-only grants are rejected by the portable profile until lossless common escaping is specified. MVP UI offers schema field checkboxes and exact names; it preserves read-only supported patterns rather than expanding arbitrary wildcard expressions into a lossy form.
+
+Conditions use exactly one of `{op,left,right}`, `{and:[conditions...]}`, `{or:[conditions...]}`. Groups must be nonempty. Left is `{field: name}`. RHS is `{value: scalar}`, `{values: [scalars...]}` for `In`, or `{param: name}`. Scalar: string, boolean, null, or finite number in the cross-runtime exact range; integers are limited to ±(2^53−1), with larger IDs encoded as strings. No arbitrary objects, YAML tags, timestamps or execution expressions. Comparisons are `==`, `In`, `>`, `>=`, `<`, `<=`. Missing fields do not match; explicit null only equals null, is not ordered. Numeric comparison uses numeric values without string coercion; incompatible types return a safe evaluation error. String ordering is UTF-8 lexical, not locale/collation-dependent. Adapters unable to match these semantics must reject the operation or use proven equivalent enforcement before paging.
+
+Authorization params are `currentUser`, `principal.roles`, `principal.groups`, `now`, declared host attributes such as `tenant`, and valid `path.<capture>`. Resolve each once from a trusted snapshot; a missing variable fails closed. `now` uses the host clock once per layer evaluation; not a client timestamp. No filesystem/env/network expressions. The MVP cross-layer fixture uses no time-dependent expressions. Query parameters have a distinct untrusted namespace and cannot override these variables.
+
+## Within-policy evaluation algorithm
+
+1. Select `everyone` and matching user/role/group rule sets; union and deduplicate them. No match leaves a default-deny policy. Prefix rule IDs by rule-set ID and sort deterministically; declaration/map order is not authority.
+2. Select rules matching operation and structural resource. Sort descending path depth, descending literal specificity, restrictive effect first, then ascending qualified rule ID.
+3. Unconditional rules decide the remaining space. Conditional allow rules ahead of that terminal authorize only rows meeting their predicates. A deeper allow may reopen a less-specific deny; an equally specific deny precedes allow.
+4. For read row eligibility, conditional alternatives are ORed, bounded by the first unconditional rule. An unconditional allow makes row eligibility unrestricted, though field restrictions remain. Query field bounds conservatively intersect all possible deciding allow alternatives in the current DALgo profile.
+5. For an existing-row write choose the first alternative whose pre-image `where` is true, otherwise terminal allow; do not fall through to a later allow after that chosen rule's field or post-image check fails. For a new row choose the first alternative whose effective check succeeds, then check fields. `check` defaults to `where`. No admitting alternative means deny.
+6. Intersect independently applied policies. Conjoin their row obligations and intersect their field sets. A denial in one policy is never reopened by another.
+
+Policy IDs and rule IDs affect stable attribution; rule ID also currently breaks equivalent-priority ties. The editor must warn that renaming a rule can change precedence. MVP does not add policy renaming or arbitrary rule-order controls. Migration tests must prove equal decisions for legacy supported constructs, including this tie behavior.
+
+## Provenance and round-trip editing
+
+Policy visibility is owner-enforced classification. `private` hides policy identity, text, rules, predicates and policy-specific references from every caller except an explicitly authorized **policy admin at that owner**. Discovery/read/Explain/diagnostics privileges alone cannot reveal a private policy. `public` merely permits ordinary owner authorization checks to disclose it; it is not public unauthenticated access. Create/import defaults public; changing this classification requires owner policy-admin authority, independently of ordinary edit permission. The owner persists and attests the effective classification and rejects a non-admin replacement that changes it. Legacy imports default public. Private restrictions may still return opaque request-scoped restriction IDs/generic denial without revealing hidden policy count or identity. These IDs cannot be dereferenced by non-admins. Classification applies to cached responses and audit access as well as policy download.
+
+Source, owner, layer, resource mount, Git revision and editability are returned in an **owner-attested envelope**, not trusted from user-editable text. `metadata.name` identifies the policy locally; global identity is `(ownerId, databaseId, policyId)`. A fetched descriptor includes the revision/ETag and source reference. Export may bundle that envelope beside the document, but import must discard claimed authority and obtain provenance from the new owner.
+
+MVP promises semantic round-trip and canonical idempotence: parse → document AST → edit → validate → serialize → parse preserves all supported fields/meaning; a second canonical serialization is byte-identical. It does not preserve comments, original whitespace, quoting, anchors or source ordering. Reject anchors/aliases, duplicate keys, merge keys, custom tags, multiple YAML documents and duplicate JSON object keys. This is stronger than assuming generic decoder unknown-field rejection suffices. Normalize map keys lexically, operation arrays to leaf order, subject/rule-set references as sorted sets; keep semantic scope/rule structures and qualified IDs intact. The UI explains that saving canonicalizes formatting. Raw text editing is optional, but parse/serialize APIs support it.
+
+Unknown-version, custom or nonportable policy documents remain represented by read-only descriptors. Never edit through a reduced AST and drop unsupported fields. A supported document with complex scope/pattern structure outside the form editor's fidelity can likewise be read-only or edited through the optional raw editor. Legacy conversion is an explicit owner-admin action with before/after differential fixtures; do not strip `target`/`composition` and call that a complete migration.
+
+
+===== FILE 04-authorization-contract.md =====
+
+# DTQL authorization, discovery and dry-run wire contract
+
+Contract C2; proposed `dtql.org/authorization/v1`. This is the normative field/type schema for implementers. JSON Schema artifacts and generated Go/TypeScript bindings are WP1/WP2 deliverables; this document does not claim a generated schema already exists. Existing query YAML remains unchanged. Management and decisions use JSON over HTTP; YAML remains the policy editing representation.
+
+## Request schema
+
+An `AuthorizationRequest` has the following closed-object shape. Unknown fields, duplicate keys and mismatched discriminators reject before evaluation. The same normalized `operation` descriptor feeds dry run and execution; no separately interpreted diagnostic query language.
+
+| Field | Type | Requirement |
+|---|---|---|
+| `apiVersion` | string | Exact `dtql.org/authorization/v1`. |
+| `mode` | enum | `plan`, `inspect` or `sample`; dry run only, never mutation. |
+| `sample` | object | Required only in sample mode: `{query:{format,text,parameters?},limit:integer}`; limit 1–100. One table, one operation template; see sampling rules below. |
+| `subject` | object | Optional `{realm,id,kind}` for privileged other-principal Explain; omitted means authenticated self. `kind`: `user`, `service`, `application`, `agent`. |
+| `simulation` | object | Optional `{roles:[id],groups:[id],attributes:{name:scalar}}`, only with `access:simulate`; marks hypothetical result. Cannot be sent as execution authority. |
+| `operations` | array | 1–100 operation descriptors with distinct caller-provided `id` (≤128 bytes). |
+| `diagnosticLevel` | enum | Requested `ordinary`, `references`, `policy`; server attenuates independently at every owner. |
+
+`plan` MUST NOT execute a data query or read stored rows. It may read policy/config/schema/identity metadata. It returns static blockers plus residual row obligations, and `conditional` where row evidence is necessary. `inspect` MAY perform bounded point reads inside the owner evaluator for supplied concrete keys; no mutation, trigger, external effect, result-set scan, or user query execution. It does not return the inspected row. Inspect requires self-operation inspection or authorized Explain scope, and disclosure limits still apply. Discovery of policies is independent of either mode: an evaluator can return a safe denial without exposing its policy text.
+
+With no concrete rows requested, plan returns disclosable **admission conditions** and field/post-image restrictions rather than guessing which rows fail. Each restriction includes `representation:expression|reference`, optional structured `expression` in C1 condition shape, and optional `omissionReason:private|too_large|unsupported`. An omitted expression retains an opaque restriction ID and disclosable policy/layer reference. Do not synthesize a negated predicate or expand combined predicates into exponential normal form. Combine by explicit references: `allOf:[restrictionId,...]` at the operation level (optional alongside `restrictionIds`); each policy retains its own bounded expression. Limit a disclosed expression to 16 KiB/256 nodes and the complete response to 256 KiB; above that emit `too_large` references, not silently truncated predicates. This changes representation, not internal evaluation completeness. Private expressions produce redacted disclosure; size omission does not mean evaluation failed. Never substitute a caller-readable simplified condition that is weaker than actual enforcement.
+
+### Bounded top-N sampling (user direction)
+
+`sample` selects at most N rows using the supplied supported DTQL query, then evaluates the single operation template for those keys; this is deliberately a read-producing **internal** diagnostic operation, unlike plan mode. No record values are returned and no mutation is executed. Default order is canonical record ID ascending; an explicit supported ordering adds record ID as a final tie-breaker. Apply authorization filters before ordering/limit. Limit bounds inspected records, and the source must also honor the elapsed/resource budget; N alone is not a scan-cost bound. Stop with partial coverage on budget exhaustion.
+
+Ordinary self-sampling is confined to the intersection of subject-readable rows and requester-readable rows through every participating layer. Other-principal Explain does not grant the requester that principal's data visibility. Broader diagnostic sampling requires separate owner-granted `access:inspect-protected`; it remains bounded and redacted, and is not required in MVP. Never retrieve arbitrary hidden rows under a service credential merely to fill N. For an intended update/delete, sample the visible candidate rows **before applying that operation's write ACL**, otherwise the sample would omit precisely the denied rows being investigated. For insert, sample mode is invalid; inspect evaluates supplied candidate data without a stored-row read.
+
+Result adds optional `sample:{requestedLimit,evaluatedCount,selection:"readable_candidates",order,exhaustive:false}`. Counts refer only to the authorized sampled set, not hidden or total matching rows. Sampled per-row decisions use only disclosable keys. The overall result describes **that sample** and must never be shown as permission for a whole bulk operation; `exhaustive` is always false in MVP, even if fewer than N rows return. A sample with zero rows is not affirmative data access. Use `result:conditional`, `allowed:false` with no sampled per-row decisions. Mutating execution never accepts sample results as authority.
+
+An operation descriptor is `{id, action, resource, query?, mutation?}`. `action` is one leaf operation from C1. `resource` is `{databaseId,path,table?,rowId?,columns?}`: path is normalized logical path, table an optional derived display identifier, rowId an optional string key, columns an array of concrete field segment arrays. For a table path and query, no rowId. Resource names must agree with the parsed query/mutation and server mount mapping; server derives rather than trusting redundant fields. Real request fields must not claim policy owner IDs.
+
+`query` for `query` action is `{format:"dtql-yaml",text:string,parameters?:{name:scalar}}`. The text uses the existing DTQL single-source query shape. Mutations are discriminated: insert/set `{data:object}`; update `{changes:[{op:"set",path:[segment,...],value:JSONValue}]}`; delete `{}`. All mutations include optional `ifDataRevision:string` for execution, mandatory when an upper conditional write relied on a remote pre-image. Other update operators are rejected in MVP; architecture and existing DALgo model remain extensible. Body is bounded to 1 MiB; report oversized before parsing rather than silently truncating at a byte limit.
+
+Public users cannot provide `effectivePrincipal`, `policySet`, `owner`, trusted variables, a signed-result substitute, or mode `execute` to this endpoint. The caller's actor and transport authority always come from authentication. Execution uses existing read/PATCH/batch endpoints with the same descriptor normalizer.
+
+## Result schema
+
+`AuthorizationResult` is a closed object with required `apiVersion`, `requestId`, `result`, `allowed`, `hypothetical`, `operations`, `layers`, `blockers`, `coverage` and `restrictions`. `requestId` is a server-generated opaque correlation ID.
+
+| Field | Type / semantics |
+|---|---|
+| `result` | `allow`, `conditional`, `deny`, `indeterminate`. |
+| `allowed` | Boolean; true **only** for final complete `allow`. Never true for residual obligations. |
+| `hypothetical` | Boolean; true for supplied simulation identities/memberships/attributes. |
+| `operations` | Array of `{id,action,resource,result,restrictionIds:[id]}` matching requested operation IDs. |
+| `layers` | Array of layer decisions described below, including known unavailable/disabled participants when visible. |
+| `blockers` | Array of structured blocking facts; may be redacted/coalesced. Empty does not imply allow. |
+| `coverage` | `{evaluation:complete|partial,disclosure:full|redacted,truncated:boolean,unevaluated:[{operationId,layerId?,reason}]}`. Reason enum: `row_evidence_required`, `evidence_not_authorized`, `source_unavailable`, `unsupported`, `budget_exceeded`. |
+| `restrictions` | Array of `{id,operationId,layerId?,kind:row_filter|field_allowlist|post_image_check|opaque,policyRef?,expression?,fields?,enforced:boolean}`. Resolved secret values/predicate text omitted unless explicitly disclosable. |
+
+Layer decision: `{layerId,source,aclState,result,policyRevision?,decisions:[...]}`. `aclState`: `enabled`, `disabled`, `unavailable`. `source`: `{ownerId,provider,databaseId,kind,reference?}`. `kind`: `datatug`, `openvaultdb`, `ingitdb`, `application`, `adapter`. `layerId` is a configured stable instance ID, not merely the product name; two OpenVaultDB hops have different IDs. `reference` is an opaque admin-safe locator, never an arbitrary URL the client should fetch.
+
+Each participating decision is `{operationId,result,policyRef?,scope,ruleRefs?:[id],bindingRefs?:[{kind,id}],restrictionIds:[id]}`. `scope`: `database`, `table`, `row`, `column`, `operation`, `principal`, `configuration`. Policy reference is `{ownerId,databaseId,policyId,revision,ruleId?}`. Policies not visible to the caller can be replaced by opaque layer-level decisions. Always preserve internal attribution before redaction. Provider-supplied source names are anchored to the configured source; cannot impersonate an upstream owner.
+
+Each blocker is `{operationId,code,scope,resource?,layerId?,policyRef?,slot?,columns?,retryable?}`. `slot` is `where`, `check`, `fields` or absent. No required English `message` or `reason` string. Clients decode the code and structured facts for localization. A condition literal, resolved param, raw exception, host file path or hidden row identifier MUST NOT be emitted merely because it exists in a DALgo error.
+
+Reduction: any definitive policy denial → `deny`; otherwise any failed/unevaluated required participant → `indeterminate`; otherwise outstanding enforceable row/post-image obligations → `conditional`; otherwise `allow`. `plan` can be conditional with `evaluation:complete` because all plan-stage work finished; every outstanding row obligation must still be explicit. `inspect` with unavailable evidence is partial/indeterminate unless another denial already decides the result. An execution success has `allow` and every required obligation enforced. Hidden diagnostics can have `disclosure:redacted` with complete internal evaluation. Never expose hidden blocker counts through a count field.
+
+Deduplicate by `(operationId,layerId,policyId,revision,ruleId,code,scope,slot,canonical resource,column)`; sort operation IDs by request order, then layer path order, policy ID, rule ID, code and path. Deduplication never merges two owners. To bound payload, group multiple columns for the same rule/code into sorted `columns`. Evaluate up to 100 operations, 32 concrete columns per operation, 100 policies per owner, 1,000 rules per policy, predicate depth 16, and 1,000 emitted facts. Configuration exceeding supported policy limits is rejected at load. Request excess rejects 400; runtime budget of 2 seconds for dry run yields explicit partial coverage. Cancellation stops work. No unbounded fan-out or enumeration; truncation makes completeness partial and never grants execution.
+
+## Reason-code taxonomy
+
+Use orthogonal code + action + scope instead of an expanding `TABLE_UPDATE_DENIED`/`ROW_DELETE_DENIED` Cartesian product. The existing OpenVaultDB outer lowercase error codes remain separate from these DTQL codes.
+
+| Code | Meaning and required facts |
+|---|---|
+| `ACCESS_DENIED` | Safe coalesced denial when details cannot be disclosed; no policy/row existence implied. |
+| `ACL_RULE_DENIED` | Winning explicit deny; action, scope, policy/rule where visible. |
+| `ACL_NO_MATCH` | Mandatory policy has no admitting rule/subject match; policy where visible. |
+| `ACL_ROW_PREDICATE_FAILED` | Actual inspected pre-image fails row admission; `scope:row`, `slot:where`. |
+| `ACL_POST_IMAGE_FAILED` | New row/candidate post-image fails effective check; `slot:check`. |
+| `ACL_COLUMN_DENIED` | Requested/touched field outside policy allow-list; `scope:column`, `slot:fields`, safe requested columns. |
+| `ACL_EVALUATION_FAILED` | Type error/unresolved trusted variable/custom evaluator failure; never raw error text. |
+| `ACL_CONFIGURATION_INVALID` | Enabled owner missing/invalid/incomplete policy set. |
+| `ACL_SOURCE_UNAVAILABLE` | Required policy/evaluation provider unreachable. |
+| `ACL_ENFORCEMENT_UNSUPPORTED` | Adapter cannot enforce required obligations or request form. |
+| `ACL_PRINCIPAL_UNRESOLVED` | Authenticated identity cannot resolve authoritative membership/context. |
+| `ACL_CAPABILITY_DENIED` | Authenticated actor/token lacks required operation scope/grant. |
+
+Syntax/version/body validation is 400 and not a pretend policy denial. Authentication failure is 401. Policy document revision conflict is 412 `policy_revision_conflict`; missing management precondition is 428. Record revision conflict is 409 `data_revision_conflict`, not an ACL blocker. These non-ACL outer errors have fixed machine codes and requestId; policy predicate errors may use `ACL_EVALUATION_FAILED` only after the request is valid.
+
+## HTTP binding
+
+Base: `/v1/databases/{db}/access`. In DataTug these calls are scoped by its authenticated project/connection route; OpenVaultDB exposes this path directly. DALgo provides equivalent Go provider interfaces, not an HTTP server.
+
+| Method/path | Action | Response |
+|---|---|---|
+| GET `/layers` | `policies:discover` | Visible descriptors: source, ACL state, policy revision, supported modes/formats, management capabilities, required/opaque lower participants. No policy text. |
+| GET `/policies?layerId=...` | `policies:list` | Authorized metadata page `{items,nextCursor?}`. Cursor opaque, owner-generated; filtering before pagination. |
+| GET `/policies/{policyId}?layerId=...` | `policies:read` | `{source,policyRef,format,document,capabilities}` plus strong ETag. Document is policy AST or YAML text according to negotiated format. |
+| POST `/policies?layerId=...` | `policies:create` | 201 descriptor, owner-assigned revision; duplicate stable ID is 409. |
+| PUT `/policies/{id}?layerId=...` | `policies:update` | Full validated replacement with `If-Match`; same ID/target, 200 new descriptor/ETag. |
+| DELETE `/policies/{id}?layerId=...` | `policies:delete` | Requires `If-Match`, 204; does not disable ACL or bypass last-policy guard. |
+| POST `/evaluate` | Self dry run or `access:explain`; `access:simulate` if hypothetical | 200 AuthorizationResult even when result denies. Request/auth failures use ordinary HTTP errors. |
+
+Capabilities are `{discover,list,read,create,update,delete,explain,simulate,diagnostics}` booleans computed for **the current requesting principal at the owner**, plus editor format support. They are UI hints, not durable permission tokens. Reading policy text does not imply edit or explain-as-another. Owner reauthorizes every operation. A list request without visibility may return empty/opaque topology instead of leaking policy presence. Disallowed policy-ID probes use a consistent not-found/forbidden projection.
+
+Add `policyAdmin` to this capability object, derived from an explicit owner-scoped `policies:admin` grant. This is the only role that may see `metadata.visibility:private` policies or change visibility. Ordinary list/read/diagnostics/Explain permissions apply only to public policies; requests for policy diagnostic level are attenuated accordingly. Policy-admin classification authority does not automatically grant data access, another owner's administration, or create/update/delete actions. Owners may provision these management grants together, but checks remain distinct. A private policy's existence/count is not separately enumerated to non-admins; coalesce its restriction into a generic owner/source result only where that source is already visible. Never return a hidden policy ID in blockers, ETags or cursor contents.
+
+Execution denial binding: HTTP 403 `{"error":{"code":"access_denied","requestId":"...","authorization":{...}}}`. Execution indeterminate/unavailable: 503 `authorization_unavailable` with result envelope, no execution; unsupported profile: 422 `authorization_unsupported`, no execution. Preserve these typed envelopes through `dalgo2openvaultdb` and DataTug. `errors.Is(err, access.ErrAccessDenied)` remains true for actual denials. Unknown **returned** future ACL codes display a generic denial with preserved code, never permit access; unknown **input** enums reject.
+
+## Example: three safe independent blockers
+
+```json
+{
+  "operationId": "u1",
+  "code": "ACL_COLUMN_DENIED",
+  "scope": "column",
+  "layerId": "ovdb-crm",
+  "policyRef": {
+    "ownerId": "ovdb-local",
+    "databaseId": "crm",
+    "policyId": "financial-fields",
+    "revision": "p7",
+    "ruleId": "update-fields"
+  },
+  "slot": "fields",
+  "columns": [["credit_limit"]]
+}
+```
+
+The `blockers` array can contain this fact, an InGitDB `ACL_ROW_PREDICATE_FAILED` for the caller-supplied path, and DataTug `ACL_COLUMN_DENIED` for status. This is a blocker fragment, not a complete result example. For an ordinary caller the row failure may be replaced by `ACCESS_DENIED` without row/policy identity; the diagnostic test principal explicitly has reference disclosure privileges at every owner. No response contains row values.
+
+
+===== FILE 05-dalgo.md =====
+
+# DALgo reusable implementation design
+
+Contracts C1/C2/C4. Extend `access`, reuse `dtql` and `condeval`, and retain existing public APIs. Do not create a separate evaluator in OpenVaultDB or DataTug. Go signatures below are proposed API sketches whose data fields are governed by C1/C2, not implementation added in this phase.
+
+## Responsibilities and package boundary
+
+`access.Policy`, `AccessPolicy`, `PrincipalPolicySet`, `WithPrincipal`, `WithVariables`, `SecureDB`, `BindDB`, secured sessions and existing codecs remain. Add the portable document adapter/version decoder alongside legacy decoding. A validated editable document AST preserves bindings, metadata and targets; it compiles into existing rule objects. Do not round-trip solely through the flattened compiled policy and lose document structure.
+
+Keep `dal` independent of YAML and HTTP. Keep protocol-specific JSON projection out of the storage interfaces. A small `access/contract` or `dtql/access` package can expose DTOs and converters without creating `access`↔`dtql` import cycles; choose one implementation home during WP2, with import-boundary tests. DTQL the repository owns normative fields and conformance vectors regardless of which Go package implements them. No immediate extraction into the placeholder `dtql-go` module is necessary.
+
+## Proposed reusable interfaces
+
+```go
+// Sketch: all named DTOs have the normative fields in C1/C2.
+type PolicyProvider interface {
+    Describe(context.Context, Caller, DatabaseRef) (LayerDescriptor, error)
+    Snapshot(context.Context, VerifiedPrincipal, DatabaseRef) (PolicySnapshot, error)
+}
+type PolicyReader interface {
+    List(context.Context, Caller, PolicyListRequest) (PolicyPage, error)
+    Read(context.Context, Caller, PolicyRef) (PolicyDocumentEnvelope, error)
+}
+type PolicyManager interface {
+    Create(context.Context, Caller, PolicyDocument) (PolicyDocumentEnvelope, error)
+    Replace(context.Context, Caller, PolicyRef, Revision, PolicyDocument) (PolicyDocumentEnvelope, error)
+    Delete(context.Context, Caller, PolicyRef, Revision) error
+}
+type Inspector interface {
+    Evaluate(context.Context, VerifiedPrincipal, AuthorizationRequest) (AuthorizationResult, error)
+}
+```
+
+Interfaces are segregated: noneditable custom providers implement only snapshot/describe or inspector. `Snapshot` is an enforcement-only capability and may contain private policy objects; it must not be exposed as unauthenticated public policy download. `Caller` is authenticated requester/actor; `VerifiedPrincipal` is immutable trusted evaluation subject. Only resolver/authentication code constructs it at a trust boundary. Hosts do not deserialize these internal capabilities from browser JSON. Add adapters from existing `Policy` objects that attach host-owned provenance and declare whether inspection is side-effect-free.
+
+`PolicySnapshot` includes stable owner/database/layer, revision, enabled state, mandatory policy objects, principal revision and evaluator capabilities. Mandatory owners are supplied by mount configuration. A provider error is a failed participant, never an empty policy slice. Built-in loaded snapshots are immutable; copy roles/groups/variables so callers cannot mutate an already-bound context. Cache compiled binding unions by snapshot revision and bounded subject-set key; invalidate on update and bound cache size (existing PrincipalPolicySet cache is unbounded).
+
+## Evaluation and enforcement split
+
+Add a richer internal assessment API (for example `Plan` and `EvaluateEvidence`) returning all decisions, blockers and obligations. Preserve `Decide` and `Authorize` as compatibility projections. Existing `Allowed` on a `Decision` must not be confused with C2 final `allowed`. Add `DeniedError` multi-decision support without breaking `errors.Is/As` or callers reading its legacy representative `Decision`; pick a deterministic representative and document it as incomplete legacy projection. Never infer structured codes by parsing English explanations.
+
+Plan receives normalized operation descriptors, current principal snapshot, immutable policy snapshot, and the original query's field-reference provenance. It evaluates table/operation and static field policies across **all** targets. EvaluateEvidence receives private pre/post images or an authorized evidence failure. These functions are called by both secured execution wrappers and Inspector. Independent failed policies continue; inaccessible-dependent checks become explicit unevaluated obligations. Do not run all losing rules and call every one a blocker; within-policy precedence is unchanged.
+
+Refactor `guard.authorizeRequest`, `AccessPolicy.Decide`, `matchResiduals` and write evaluation to accumulate safe independent failures before returning. Field policies that apply unconditionally can be evaluated despite another policy's row denial. Row-dependent field alternatives cannot be guessed if their deciding row is unavailable. Batch targets are evaluated before delegating any writes. Built-in custom policy callbacks that are not declared pure are enforced on execution but produce `unsupported` inspection coverage; never replay side effects to explain them.
+
+A `QueryPlan` holds original caller references separately from owner-injected predicates. Move DataTug's hidden-reference/alias safeguards into this reusable path. Deny filters/sorts/projections on forbidden fields. Apply all row filters before paging. Field redaction remains defense in depth, not a substitute for query semantics. An adapter returning inconsistent rows must be rejected before publishing a partial success result; the supported bounded MVP API buffers up to its row limit. Streaming late-error guarantees are follow-up.
+
+Private mutation evidence must include whole-record revision and final candidate image. For `set`, compute deleted as well as supplied field paths; do not let replacement remove a protected field. For nested object set, include all affected descendants; a grant to one child cannot replace its siblings. Deny unsupported updates rather than approximate post-images. Strengthen wrappers without requiring caller-visible read permission for in-process enforcement reads. Across HTTP, require advertised revision capability or fail closed for row-dependent writes.
+
+## Tests and migration gates
+
+Keep baseline legacy tests passing. New tests: golden DTQL documents and canonicalization; strict duplicate/unknown-key parsing; user+role+group union; tie precedence; differential legacy adapter conversion; multiple-policy/target blocker sets; read plan conditional vs inspect exact; unsupported custom inspection; safe codes without English dependencies; no hidden-field filter/sort bypass; set deletion/nested writes; immutable principal snapshots; missing enabled policies; adapter residual rejection; schema/DTO import boundaries.
+
+Use recording adapters to prove no read in plan mode, only bounded reads in inspect mode, and zero writes/triggers/commits in both modes. Property tests for cross-policy monotonicity and result invariance under policy iteration order are high-value. Fuzz path/field parsing, duplicates and depth/size bounds. Existing `end2end/test_access.go` is the extension point for adapter conformance. Do not build a new fleet-wide ACL test framework.
+
+
+===== FILE 06-identity.md =====
+
+# Identity, authentication and principal propagation
+
+Contract C3. Authentication establishes a subject and acting client; authorization uses trusted current membership and grants. DTQL is not a login, token issuance or identity federation protocol.
+
+## Canonical identity
+
+Honor approved OpenVaultDB decision 0004: hosted users have the verified shared Sneat Co. Firebase UID as canonical internal `userID`, in the configured Sneat identity realm. Do not add a second hosted OpenVaultDB user ID. This is an existing application account identity, not a Google/GitHub OAuth subject. External provider bindings remain managed by the existing identity infrastructure.
+
+For self-hosted deployments without an established internal user key, use opaque generated stable IDs in a configured realm; store in the host identity directory, not a policy file. The portable principal reference is `(realm,kind,id)`. User, service, application and agent IDs do not share an untyped collision domain. Roles/groups likewise have stable owner-scoped IDs, not display names. Policies resolve binding keys in the database's configured realm. Cross-realm identities require explicit trusted resolver mapping; string equality of IDs is insufficient.
+
+External binding storage conceptually maps `(OIDC issuer,subject)` or `(provider instance,subject)` uniquely to the internal account. One account can have several bindings; no email-address auto-linking, display-name matching or policy rewrites. Link/unlink requires authenticated account control and the existing provider's verification flow. A provider rename/configuration change must not orphan policy identities. Identity-directory secrets and OAuth tokens must not enter Git policy files.
+
+## Reuse and MVP profile
+
+DataTug already depends on shared Sneat/Firebase auth; hosted OpenVaultDB already specifies that same authority. Self-hosted OpenVaultDB has opaque bearer tokens, hashed persistence, expiry/revocation and application capabilities. Reuse these, extending the grant record with stable subject reference, registered actor/client reference and delegation scope. The existing client_id-only application grant must remain distinguishable from a user delegation. Owner tokens map to an explicit local bootstrap principal rather than an anonymous omnipotent human.
+
+MVP E2E uses a configured self-hosted resolver and preprovisioned opaque tokens for stable fixture accounts, roles/groups and clients. This proves authenticated principal propagation without building OIDC issuance. Production hosted login remains the shared identity flow; wire compatibility and mapping tests cover it, but deploying cloud account linking is not an MVP prerequisite. No homemade JWT or new identity database in DALgo.
+
+## Trusted context
+
+Internal context fields: subject `{realm,kind,id}`, actor `{realm,kind,id}`, database/mount audience, granted token capabilities, role IDs, group IDs, trusted authorization attributes, identity/membership revision, authentication strength if available, and request ID. Bind after token verification. Deep-copy and treat as immutable for one short operation. Ordinary request JSON cannot set `roles`, `groups`, `currentUser`, `tenant`, `now` or path captures.
+
+Roles/groups resolve from authoritative current state for the target realm/space. Long-lived tokens must not permanently snapshot membership. MVP fixture resolver reads current local state at each request; hosted resolver observes decision 0004's current-membership requirement. If a required resolver is unavailable, fail closed. Any cache must have explicit revocation semantics; do not invent an unspecified “short cache” as a guarantee. Principal revocation between dry run and execution is tested by authenticating anew.
+
+Authorization is bounded by **both** actor capability/delegation and subject policies. A powerful subject does not widen a narrow application's scope; a privileged application does not inherit permission to act as any user. Application/service policies are additional restrictions, with distinct provenance. Role/group membership enables bound rule sets only after resolution; no additive cross-layer override.
+
+## Hops
+
+Browser → DataTug daemon: reuse authenticated daemon session/bootstrap protection and approved origins. A Firebase UI sign-in alone is not proof that a loopback daemon request has the right authority. Bind the session to the authenticated user and connection. Do not forward browser principal fields as facts; local CLI simulation flags remain local simulation.
+
+DataTug → OpenVaultDB: use an existing OpenVaultDB-issued credential bound to registered DataTug actor and stable subject, target database and permitted operations. In MVP preprovision this binding through owner administration; no new token-exchange protocol. Do not forward an unrelated Firebase bearer token to a receiver that does not validate its issuer/audience. Never send the owner token as the ordinary query credential. Transport must use TLS outside loopback.
+
+OpenVaultDB → embedded InGitDB: verified immutable Go context, with owner-configured realm mapping. No network authentication protocol is needed at this hop. Direct InGitDB Go callers supply a trusted local resolver; supplying arbitrary `access.WithPrincipal` from hostile code is outside the library boundary. Remote InGitDB access uses OpenVaultDB by product decision.
+
+Other-principal Explain checks the **requester's** `access:explain` at each source, then resolves the target principal independently. Supplying custom memberships/attributes additionally requires `access:simulate` and marks all outputs hypothetical. Execution endpoints reject simulation fields. Audit records preserve both requester and simulated subject without leaking tokens/attributes. API/service identities can be evaluated identically using their kind and bindings, never impersonated as humans.
+
+
+===== FILE 07-ingitdb.md =====
+
+# InGitDB integration
+
+User-confirmed product direction: OpenVaultDB serves remote InGitDB connections. InGitDB owns schema/data/policy storage and local adapter enforcement. This preserves the removed-server ADR and avoids two competing authentication and serving stacks.
+
+## Ownership and storage
+
+Add a validated root configuration reference for ACL mode and a policy manifest, proposed `.ingitdb/access/manifest.yaml`, with documents under `.ingitdb/access/policies/<policyId>.yaml`. These are schema/configuration metadata, never ordinary collection records. Root config explicitly declares `acl.enabled` and the manifest reference. Manifest records owner database ID, identity realm, expected policy IDs/files and active revision; no tokens. Exact config integration is WP4 and must fit the current `ingitdb/config/root_config.go` parser conventions.
+
+Mode defaults disabled for old repositories only when no ACL configuration has ever been enabled. When enabled, an absent/corrupt manifest or referenced policy fails closed. Do not scan an empty directory and treat that as unrestricted. The server pins enabled configuration on mount so deleting the root file while running cannot disable enforcement; restart bootstrap must also use configured enabled requirements. Explicit mode changes require configuration-admin authority outside policy CRUD. A malicious repository/OS owner can change all files and is outside this ACL boundary.
+
+Policy CRUD validates the entire candidate set (IDs, target, bindings, supported format) before publishing it. Use owner-issued strong revisions and expected-revision comparison, existing cooperating writer lock, atomic file replacement and one Git commit over the policy/config changes. A failed commit restores the prior active files and revision; successful response means disk/revision and active snapshot agree. Reconnect/restart reloads the committed policy state. Revision should be a manifest/content digest covering all active policy bytes and configuration, with Git commit as provenance, rather than assuming every data commit changes policy semantics.
+
+Load only manifest-listed regular files beneath the fixed policy root. Reject symlinks/path traversal/duplicate canonical paths and policy IDs. Generic record endpoints, bulk exports, inferred schema, collection enumeration and DDL must not expose or mutate this metadata. No policy source URL fetches. Git history access is a separate repository privilege; runtime policies do not retroactively redact Git commits.
+
+## Adapter integration
+
+`ingitdb/dalgo2ingitdb.NewDatabase`/public opening route loads owner configuration before exposing a handle. Keep raw database state private and return a secured DALgo facade that retains schema/introspection capabilities through explicit forwarding. Never lose enforcement when callers open transactions or request an alternate reader interface. Direct trusted application constructors and OpenVaultDB mounts use the same owner loader. Existing ACL-disabled users retain legacy semantics.
+
+Enforcement obtains pre-images inside the adapter's existing transaction lock without exposing them as public `get` permission. All record writes, including batch, evaluate owner policy before filesystem mutation. The final post-image must be validated after supported transformations. Policy changes use the same owner admission/barrier convention. Root-record whole revisions support remote conditional writes; check revisions inside the transaction before any mutation. For MVP one-key UPDATE is the real write; bounded multi-target acceptance proves no partial writes where batch is supported.
+
+InGitDB implements policy provider/reader/manager/inspector independently of OpenVaultDB policy storage. OpenVaultDB may proxy owner operations but must call the owner authorization check with the actual requester. An OpenVaultDB admin is not automatically an InGitDB policy admin. InGitDB reports its own source ID and policy references even when called in-process.
+
+Plan-only inspection reads no rows. Key inspection can read a private image and return a safe row ACL fact even if public get denies it, subject to diagnostic authorization. Sampling uses secured reads for candidate selection; no hidden-row enumeration. The Inspector invokes the same assessment functions as the secured operation.
+
+## Acceptance and known boundaries
+
+Open adapter directly and through OpenVaultDB with identical principal: same InGitDB decisions. Pass empty/new contexts after binding: mandatory DB policies remain. Tamper/miss manifest: deny, not disabled. Policy replace/reload/reconnect: same revision and behavior. Failed write: byte-identical records and no data Git commit. Failed policy edit: old snapshot persists. Direct file edits by noncooperating tools do not participate in locks; detect invalid revisions/reload conservatively but do not promise protection against the filesystem owner. Cloud GitHub adapter support is a later capability, not assumed from local filesystem support.
+
+
+===== FILE 08-openvaultdb.md =====
+
+# OpenVaultDB integration
+
+OpenVaultDB is the shared remote server for InGitDB and other sources. It owns remote authentication, mounted source routing, transport and additional policies. It never replaces InGitDB's own policy ownership. DataTug can promote/open an OpenVaultDB connection for an InGitDB database without a separate InGitDB server installation.
+
+## Mount and operation path
+
+Extend manifest ACL configuration with explicit mode, owner policy store reference, realm, and required lower-provider capability descriptor. `pkg/mount/mount.go` opens InGitDB through its secured public constructor, then attaches OpenVaultDB's own policy layer before `core.Open` exposes operations. Existing actor capability checks remain an independent restriction. Review every escape route: `/query`, `/dtql`, GET/HEAD, PATCH/PUT/POST/DELETE, batch, schema/collection operations and direct core calls. ACL-enabled unsupported operations fail closed rather than using an unwrapped path.
+
+Keep transport handling in `pkg/server`, source-independent execution in `pkg/core`, and source opening in `pkg/mount`. `core` accepts verified context and normalized descriptors; no separate handwritten ACL algorithm. `/dtql` should deserialize safely before collection-capability evaluation so collection-scoped grants can be assessed correctly, reusing one parsed AST. Limit bodies with explicit over-limit detection and validate query references. Avoid rendering a protected structured query into unrestricted SQL.
+
+Static OpenVaultDB checks, InGitDB assessments and final enforcement use the reusable DALgo machinery. Expose discovery, policy read/CRUD and evaluate routes from C2. Advertise lower owner descriptors and capabilities without flattening them. Authenticate/authorize management at the actual owner; `layerId` resolves through a configured registry, not user-provided URL/file paths.
+
+## Stores and publication
+
+OpenVaultDB's policy files live in its own configured metadata directory beside the manifest, distinct from InGitDB metadata. Use a manifest-listed set, atomic replacement, whole-set validation, strong revision/ETag and owner administration. Changes persist across process restart and mount reconnection. Synchronize activation with the short-operation policy snapshot barrier. A DELETE of the final mandatory policy is rejected until an authorized replacement set exists; deleting a file is never ACL disablement.
+
+The current owner-token shortcut only grants OpenVaultDB control-plane capabilities. On an ACL-enabled mount it must not skip OpenVaultDB/InGitDB data policies. Bootstrap can manage its own policy store but cannot silently edit a lower owner's policies. Map fixture owner identities to explicit separate management grants. Existing auth-disabled behavior is allowed only on legacy disabled mounts; enabling the protected ACL profile with unresolved identity configuration must reject startup/mount.
+
+## HTTP driver and revisions
+
+Extend `dal-go/dalgo2openvaultdb` typed error parsing to preserve C2 decision envelopes, not only code/message strings. Existing consumer code receives a typed authorization error compatible with DALgo denial matching. Include revision metadata on authorized point-read responses and accept `ifDataRevision` on key-targeted mutation/batch operation. Require backend whole-record revision support for remote conditional writes; validate within the same local short transaction as pre/post-image checks and mutation. No optimistic preflight “allow” is accepted instead.
+
+The DataTug application can request lower dry run even when its own policy denies. `/evaluate` never calls the write executor: plan mode stays metadata-only; inspect uses bounded internal point evidence; sample reads authorized candidates under its separate bounds. Capabilities/disclosure are checked before returning enhanced diagnostics. Policy text access is not required for lower-layer enforcement; a backend may provide only an opaque decision.
+
+## Arbitrary underlying sources
+
+MVP reference is local InGitDB; add a focused SQLite conformance smoke proving OpenVaultDB-owned table/field enforcement over a source without DTQL-native policies. This is enabling validation, not a second full UI E2E. A legacy source can declare `nativeAcl:opaque`: OpenVaultDB adds its policies but cannot enumerate native rules or promise full lower-blocker completeness. Adapter/native denial remains authoritative and appears with opaque source provenance. A native DB being DTQL-unaware does not mean its ACL is disabled.
+
+Capabilities must distinguish structured query restriction, field/reference checking, transactional pre/post images, whole-record revision preconditions, policy discovery/read/edit, plan/inspect/sample and diagnostic disclosure. Unsupported row enforcement, collation mismatch, hidden evidence or transactional behavior blocks that operation. Do not imply that adding a DALgo wrapper retrofits atomic authorization into every adapter. Remote custom ACL services, native policy import and GitHub-backed policy editing remain follow-up.
+
+## Tests
+
+Extend auth tests for actor/subject conjunction, owner-token non-bypass and current-membership changes. Server tests verify response codes, multiple blockers, redaction and CRUD preconditions. Mount tests prove lower-policy loading survives direct access and reconnect. Core tests cover every operation path and no schema/trigger side effect on denial. Driver tests preserve typed errors and revision conflicts. Native/unknown sources report partial/opaque coverage. Update stale auth/threat-model/DTQL comments as part of integration.
+
+
+===== FILE 09-datatug.md =====
+
+# DataTug policy UI, dry run and Explain Access
+
+## Server and client responsibilities
+
+Reuse DataTug CLI `pkg/accesspolicies` loading, variable parsing and secured read orchestration. Replace its English-derived binding attribution and field-union presentation with structured evaluator output. Move generally applicable field-reference enforcement into DALgo. Expose owner provider APIs through the existing daemon/connection architecture; do not implement an ACL evaluator in TypeScript. Preserve trusted local CLI `--no-policies`/principal simulation behavior separately; HTTP clients cannot disable mandatory server policies or assert arbitrary roles.
+
+The daemon owns DataTug policies in a configured per-connection manifest store, using the existing policy directory loader as a starting point with stricter owner-configured path/revision rules. A user-provided CLI directory is not automatically a server-admin policy store. Extend authenticated middleware to bind principal context; replace request-path `context.Background()` loss for protected execution. Policy CRUD persists at the owner, never in browser storage alone.
+
+## Policy workspace
+
+Connection → Access opens visible layers in route order. Show owner/product, database, enabled/disabled/unavailable state, revision and visible policy names. Multiple instances of the same product have distinct source labels. A non-public lower layer is “additional restrictions may apply” where even its identity is private; do not show an invented green allow row.
+
+Selecting a readable policy shows subjects (users/roles/groups), operations, paths, row admission/post-image conditions and fields. Show editability from owner capabilities and editor-format support independently. Custom/read-only policies stay visible with provenance and explanation support. Form editor MVP handles the common fixture shape, stable rule IDs, subject bindings, comparisons/AND/OR and exact schema fields; it must preserve the full AST of untouched supported structure. If fidelity cannot be guaranteed, show read-only instead of silently rewriting it. Optional raw YAML editing uses the same parser/validator.
+
+Create/update/delete are privileged owner operations. Save validates locally for feedback and authoritatively at the owner, sends `If-Match`, and waits for the returned new revision before updating UI state. Conflict shows server revision and preserves the draft for comparison; no automatic overwrite or broadening merge. Delete requires owner permission and never turns ACL off. Changing “denied columns” in the form serializes an explicit allowed-field policy; label that new fields are denied until granted. Never promise a native deny-list DSL absent from the contract.
+
+After save, reload the owner document and rediscover revisions, clear cached Explain/results tied to old revisions, and label preexisting result tabs stale. Reconnect/restart must obtain policies again from the owner. Policy text/source locators are not analytics payloads. Render labels and policy descriptions as text, not HTML or clickable arbitrary URLs.
+
+## Explain and dry run
+
+Use one UI with three choices: **Policy conditions (no rows read)**, **Specific row IDs**, **Sample top N readable candidates**. With no rows, show structured admission predicates where disclosable and small, otherwise opaque restrictions marked private/too large. Never imply that omitted conditions mean unrestricted access. Per-layer result vocabulary: Allowed, Conditional, Denied, Could not evaluate, ACL disabled. Effective result uses the C2 reducer.
+
+Default subject is authenticated self and actual resolved memberships. Authorized Explain users can select another stable principal; server resolves roles/groups. Hypothetical role/group editing is a separately privileged simulation and visibly labeled; it cannot become execution context. Operation selection distinguishes query/get/exists and insert/set/update/delete. A write Explain requires candidate data/changes to evaluate post-image checks; selecting only “update” and a path gives static/conditional results, not a fabricated final answer. WP1 should make absent mutation content a plan-only operation descriptor; inspect of an update without changes rejects 400.
+
+For specific keys, show per-path/per-column blockers grouped by owner, preserving policy references. Ordinary callers get whatever safe projection each owner permits. Private rows are never fetched into the browser for Explain. For sampling, show selection/filter/order, requested limit, evaluated count and “sample only”; no claim about every matching row, no hidden row count. A zero-row sample is inconclusive. Users can run a new explicit sample, not an unbounded “explain all” action.
+
+```text
+customers/123   UPDATE credit_limit, status
+InGitDB       Denied        tenant-access / update-tenant
+OpenVaultDB   Denied        financial-fields / update-fields
+DataTug       Denied        workflow-fields / update-fields
+Effective     Denied
+Some additional row checks were not evaluated because evidence is private.
+```
+
+This display requires granted reference diagnostics; ordinary users may see generic source-level denial instead. No hard-coded English explanation arrives from DTQL; DataTug localizes reason codes and renders safe facts. Each response displays policy revisions and whether it was plan/inspect/sample, hypothetical and complete/partial. Changed revisions invalidate prior displays. Explain is explicitly advisory until the actual operation is reauthorized.
+
+## Real read and write
+
+Reuse the query result grid for a supported DTQL query through the daemon → OpenVaultDB connection. ACL-enabled native/opaque query tabs are rejected unless a separately supported future enforcement profile exists. Do not rely on the browser's SQL convenience parser to establish accessed tables/fields. Keep the existing query builder read-only by construction.
+
+Add a small record-edit flow on an authorized row: choose exact fields, edit scalar values, optionally Explain the candidate, submit a key-targeted typed UPDATE with the owner data revision. The server obtains/validates evidence and binds its policy snapshot; stale record → conflict and reload, never silent retry. Display returned blockers across layers in one response. A write may be denied even when buttons were enabled or Explain previously allowed; the UI must handle this as normal changed-state behavior.
+
+## UI acceptance
+
+Accessible keyboard form and tables, clear textual statuses (not color alone), progress/cancel for dry run, sanitized errors, and retained draft on failed save. Tests use signals/OnPush-compatible behavior through Nx targets determined from installed project configuration. E2E must use the real daemon/server/adapter, not only mocked policy responses. Use test-only fixture credentials via server provisioning, never bake owner tokens into the frontend.
+
+
+===== FILE 10-security.md =====
+
+# Security analysis and administration
+
+## Assets, adversaries and boundaries
+
+Protect row/column contents and existence where private; policy text/literals, source locations and membership; policy integrity; mutation integrity; credentials; and correct negative decisions. Adversaries include authenticated low-privilege users, malicious browser requests, overprivileged application credentials and malformed provider responses. Trusted components are owner authenticators/resolvers, DALgo evaluator, secured adapter code and OS/storage administration. A hostile filesystem owner, raw database credential holder or malicious code in the same process is not contained by a DALgo wrapper.
+
+## Diagnostic disclosure profiles
+
+| Requester authority | Permitted default information |
+|---|---|
+| Unauthenticated | Authentication failure only, no topology/policies/rows. |
+| Ordinary authenticated data caller | Overall outcome, own requested action/columns where safe, generic coalesced `ACCESS_DENIED`, correlation ID, disclosable restrictions only. No hidden row existence or count. Self plan/inspect does not confer policy-read privilege. |
+| Owner policy reader/admin | Authorized owner policy text and references; data read and enhanced lower diagnostics are separate privileges. Admin of OpenVaultDB is not admin of InGitDB. |
+| Authorized Explain caller | Decisions for authorized target principal/resources; actual target membership resolution; only each owner's allowed diagnostic projection. Predicate literals still require policy-read/disclosure permission. |
+| Trusted internal component | Minimum evidence/decisions granted by owner integration. Trusting a component to compose denials does not imply authority to download rows/policies. Raw pre/post images stay in the enforcing owner unless explicitly readable. |
+
+Separate owner grants: `policies:discover/list/read/create/update/delete`, `access:explain`, `access:simulate`, `access:diagnostics` (policy/rule references and safe blocker facts), optional future `access:inspect-protected`, and out-of-band ACL configuration administration. Capabilities may be database/owner scoped, with no cross-owner wildcard delegation in MVP. Data grants do not grant policy administration. Role/group editing is an identity administration operation, outside data policy CRUD.
+
+User-directed privacy rule overrides the general disclosure table: new/imported policies default `visibility:public`. Only explicit owner-scoped `policies:admin` can disclose their identity/text/conditions or change classification. A policy reader, editor or Explain caller without that grant cannot see a private policy, even with reference diagnostics. Private custom/application policy descriptors also remain hidden. Generic outcomes/opaque restriction obligations still reach non-admins; never reveal their count. Existing public policies may be edited by delegated editors with the requisite CRUD rights; those editors cannot declassify policies. Revalidate visibility per request and invalidate UI/server caches after visibility changes.
+
+Public response projection happens after internal reduction. Redaction cannot turn deny/unknown into allow. Do not expose number of redacted blockers, whether a hidden key exists, sensitive predicates, resolved variables, absolute paths, provider response bodies or stack traces. Conditions may contain sensitive literals even without parameters. If private or too large, return opaque restrictions per C2. Missing and denied paths should have indistinguishable public shapes and policy topology exposure. Exact constant-time behavior is not promised; rate-limit inspection and avoid obvious query-count/timing oracles.
+
+## Bootstrap and administration
+
+Provision an owner-management principal and grant through authenticated local configuration/CLI before enabling ACL. Validate a complete policy set and at least one recoverable owner manager. Management ACL resides in the existing capability/control-plane store, not a data policy that can recursively lock its own validation. Initial fixture manager credentials are not ordinary data credentials. Emergency repair requires explicitly logged local owner control; it does not introduce a public bypass token for data or lower policies.
+
+Create/update/delete must authorize against the **current** owner's management grants, validate the whole candidate set and perform compare-and-swap. A policy document cannot grant its author management authority or change its own owner/target. Prevent removal of the last required policy/management route; failed validation leaves current snapshot. Reject lower-layer replacement via upper store. Required layer topology is configured server-side. No “ignore unavailable layer” retry control is exposed.
+
+## Threat/control/test matrix
+
+| Threat | Required control | Acceptance |
+|---|---|---|
+| Principal/tenant spoofing | Verified subject+actor, trusted variable namespace, current membership | T12, T13 |
+| Upper allow bypasses lower deny | Mandatory independent owner layers, secured constructor | T02, T03 |
+| Stop-first denial hides other safe blockers | Shared bounded inspection; static blockers continue | T07, T08 |
+| Hidden row leaked by inspection/sample | Internal evidence, per-owner projection, requester∩subject readable sampling | T09, T18 |
+| Hidden column filtered/sorted/aliased | Common AST reference validation before execution | T10 |
+| Stale dry-run grant or remote pre-image | Re-evaluation plus owner-issued whole-row CAS inside transaction | T11 |
+| Replacement deletes protected fields | Pre/post field-diff and subtree checks | T16 |
+| Dropped context/alternate session | Bound DB mandatory policies, no Background context on ingress | T03, T13 |
+| Policy tampering/CRUD races | Owner control-plane privileges, manifest, atomic publication, ETags | T05, T14 |
+| YAML bombs/path traversal/duplicate keys | Strict grammar, finite limits, no aliases/tags/symlinks | T15 |
+| Custom/provider failure or opaque native ACL | Explicit coverage and unsupported/error deny | T08, T17 |
+| Trigger/schema side effects before denial | Final-candidate validation, no side effects in dry run, transactional write path | T08, T16 |
+| Browser XSS/CSRF/credential theft | Text rendering, origin/session protection, no owner token in client | T12, UI suite |
+
+Audit policy administration, identity changes and denied execution with subject/actor, owner, policy revision, safe codes and correlation ID. Do not log raw bearer tokens, row contents or all query parameter values. Enhanced audit access is privileged and retention is an operator configuration; a new audit delivery service is not MVP. Callback/custom policy side effects are not repeated by dry run.
+
+Read filtering does not hide authorized aggregates that the profile does not support; aggregates are rejected until leakage semantics are designed. Row-level restrictions can leak via underlying uniqueness/foreign-key validation errors, schema discovery and generated fields; protected profiles sanitize these errors and limit metadata separately. Source-native ACL failures remain authoritative even when no structured reason is available.
+
+
+===== FILE 11-acceptance.md =====
+
+# Executable acceptance and E2E test plan
+
+These are implementation acceptance specifications, not tests already implemented or passed. Every test uses the frozen C1–C6 contracts; assertions compare structured codes/provenance, not English messages. Fixture setup uses isolated temporary directories and loopback services. No production databases or external identity service required.
+
+## Reference fixture
+
+Start the real DataTug daemon, OpenVaultDB HTTP server and local InGitDB adapter, with a real Git repository and persisted policy stores at all three owners. Drive the real browser policy workspace/query grid/record edit via the app's E2E runner. Record exact component SHAs/versions, policy revisions and test artifact hashes. Policy fixtures explicitly use `visibility:public` where non-admin reference diagnostics are asserted; privacy tests use private policies.
+
+Principals in realm `acl-e2e`: `user-alice` (role `crm-editor`, group `crm-team`, trusted `tenant=A`), `user-bob` (no editor binding), `policy-admin` (owner-scoped policy admin/CRUD grants), `policy-editor` (delegated CRUD only for selected public policies), actor `datatug-client` (delegated to Alice, read/update scope only). Also provision direct OpenVaultDB Alice token and direct InGitDB trusted principal context. Admin rights per owner are explicit. Diagnostic Alice has `access:diagnostics` for safe references at all owners; ordinary Alice token omits it. No owner token in browser.
+
+Rows have fields `id,tenant,country,status,name,email,credit_limit`. ID is the record key and visible for authorized rows; update of ID is unsupported.
+
+| ID | tenant | country | status | name | email | credit_limit |
+|---|---|---|---|---|---|---|
+| 101 | A | IE | active | Ada | ada@example.test | 100 |
+| 102 | B | IE | active | Bea | bea@example.test | 200 |
+| 103 | A | US | active | Cal | cal@example.test | 300 |
+| 104 | A | IE | paused | Dee | dee@example.test | 400 |
+| 105 | A | IE | active | Eli | eli@example.test | 500 |
+
+Each layer has separate mandatory **row-access** and **field-access** policies. This is intentional reuse of DALgo intersection: unconditional field checks remain independently evaluable when a different row policy denies. Do not attempt to encode conditional `deny fields` rules.
+
+| Owner | Row policy: `get/exists/query/update` on `/customers` | Field policy read | Field policy update |
+|---|---|---|---|
+| InGitDB (`ingit-crm`) | `tenant-access`: allow where tenant == trusted tenant; check defaults where | All fixture fields | name,email,credit_limit,status |
+| OpenVaultDB (`ovdb-crm`) | `country-access`: allow where country == IE; check defaults where | All fixture fields | `financial-fields`: name,email,status |
+| DataTug (`datatug-crm`) | `workflow-access`: allow where status == active; check defaults where | All fixture fields | `workflow-fields`: name,email,credit_limit |
+
+All row policies use the bound `editor` rule set with user/role/group matches; selecting multiple matches deduplicates. Field policy read rules are unconditional, update field rules unconditional. No policy grants other data actions in the baseline; insert/set/delete tests temporarily add explicitly scoped rules. Add a read-only application `Policy` named `application-boundary`, public to the test principal, allowing only customer reads/update. It implements pure inspection, is mandatory and noneditable; no external service is needed.
+
+## Core end-to-end flow
+
+### T01 — Real query, conditions and concrete Explain
+
+Given baseline policies, when DataTug runs DTQL `from: {name: customers}` ordered by ID, then actual result IDs are exactly `[101,105]`. Record query execution at the storage boundary to prove tenant AND country AND status constraints apply before limit. Re-run with limit 1: `[101]`, not an empty page caused by post-page filtering.
+
+When plan dry run runs with no row IDs, then no adapter row read/query occurs, result is conditional with row admission restrictions for each owner, and safe expressions or private/too-large references. Inspect `get /customers/101` allows; inspect `get /customers/102` denies InGitDB; actual gets match at unchanged snapshots. A query filtering to 102 succeeds with zero visible rows; Explain `query` must not falsely claim a point-get allow or list hidden rows.
+
+### T02 — Real successful UPDATE
+
+Given authorized revision-bearing read of 101, when the browser changes `name` to `Ada Updated`, explains the same update and submits it, then Explain and execution allow, exactly that field changes, owner data revision changes, and one data Git commit records the mutation. All three row policies and field policies participate. Verify persisted file contents independently; an HTTP 200 alone is insufficient.
+
+### T03 — Independent enforcement and bypass attempts
+
+Given unchanged policies, when DataTug permits a lower-denied operation, then OpenVaultDB/InGitDB still deny. Direct OpenVaultDB updates of 102 fail at InGitDB; direct OpenVaultDB update `credit_limit` on 101 fails at OpenVaultDB. Direct InGitDB update of 102 fails at InGitDB. Direct OpenVaultDB change of `status` on 101 may succeed if its own/lower post-image constraints permit it: this correctly demonstrates DataTug policy scope, not a lower-policy bypass. Restore fixture after each branch. New `context.Background()` and transaction/reader handles cannot discard mandatory owner policies. An owner token has no data ACL override on an enabled mount.
+
+### T04 — Deterministic composition
+
+Given user/role/group all bind editor, then authority is not multiplied. Permute policy load order and subject membership order: same effective restrictions/blocker sets after canonical sorting. More-specific allow reopens same-policy parent deny; same-specificity deny wins; a separate policy deny remains final. New no-match principal Bob denies despite everyone/other unmatched permissions. Table no-match denies before data access.
+
+### T05 — Edit, persist, reconnect, rediscover, execute
+
+Given `policy-editor` can update the public OpenVaultDB financial-fields policy, when the UI adds credit_limit to its update allow-list using current ETag, saves, reconnects and restarts OpenVaultDB, then rediscovery returns the new persisted revision and AST. Explain update credit_limit on 101 now allows; actual UPDATE succeeds while status remains denied at DataTug. Restore policy, reconnect and verify denial returns. Create/delete an extra narrowing test policy through UI and verify behavior and revisions after reload. Unauthorized owner or stale ETag cannot mutate it; removing the last mandatory policy cannot disable ACL.
+
+### T06 — Read-only and custom policy representation
+
+Given application-boundary is visible and noneditable, then UI displays its source and contribution, with no save/delete controls. Direct CRUD API attempts fail. Make its pure evaluator deny in a controlled fixture: Explain and real operation both deny with application provenance. A nonserializable custom policy is not omitted or rewritten. Non-pure inspection is explicitly partial/unsupported.
+
+### T07 — Three blockers from one intended UPDATE
+
+Given diagnostic Alice requests update 102 setting credit_limit=10000 and status=vip, when DataTug runs inspect or handles the denied write, then return at least these three independent safe facts in one structured response:
+
+1. InGitDB tenant-access: `ACL_ROW_PREDICATE_FAILED`, row scope/where.
+2. OpenVaultDB financial-fields: `ACL_COLUMN_DENIED`, credit_limit.
+3. DataTug workflow-fields: `ACL_COLUMN_DENIED`, status.
+
+Each fact retains its exact owner/layer, policy revision and rule reference. Upper row predicates needing unavailable pre-image may be unevaluated, with explicit partial coverage; this does not remove the known three denials or fabricate additional predicate failures. No row values are disclosed. Data bytes and Git HEAD remain unchanged. Repeat with ordinary diagnostics: outcome still denies, hidden facts coalesce safely.
+
+### T08 — Dry run purity and bounded completeness
+
+Given instrumented storage/provider callbacks, plan makes zero data reads; inspect reads only supplied bounded keys; sample issues one bounded candidate selection plus bounded assessments; all perform zero mutation/trigger/Git commits. Upper static deny still requests lower safe evaluation. A required unavailable provider gives partial coverage and deny/indeterminate, never allow. Timeout/truncation is visible. Execution cannot use a dry-run response as permission. Malicious custom callbacks cannot execute through a purity-undeclared inspect path.
+
+## Security and contract cases
+
+| Test | Given / When | Required observable outcome |
+|---|---|---|
+| T09 Private policy disclosure | Private policy; reader/editor/Explain/diagnostics non-admin requests text, ID probe, conditions, blockers and sampling | Generic denial/opaque restriction only; no name, ID, text, predicate, hidden count, revision or existence oracle. Same owner policy admin can see it. OpenVaultDB admin cannot see private InGitDB policy without InGitDB admin grant. |
+| T10 Field inference | Query selects, filters, sorts, aliases or computes on a hidden field | Rejected before query; wildcard selection redacts; no filter/order leakage. Unsupported joins/functions/native SQL fail closed. |
+| T11 Changed state | Explain permits; change row/policy/membership before actual mutation | Actual current policy/membership denies, or data CAS conflicts; no write. Include hidden-field-only change to prove whole-row revision, not projected hash. |
+| T12 Request spoofing | Browser sets principal/roles/tenant or uses unrelated issuer token/client | Reject/ignore untrusted identity fields per contract, never grant. CORS/session and missing/expired token tests fail safely. |
+| T13 Actor and membership | Subject permits but actor scope denies; remove role/group after dry run; omit context | Capability/principal blocker; current resolver enforced; missing required identity fails closed. |
+| T14 Policy integrity | Concurrent edits, invalid candidate set, symlink/traversal, missing enabled manifest, failed Git commit | 412/validation error and prior state unchanged; no disabled fallback; restart preserves old or new complete set only. Non-admin cannot change private/public classification. |
+| T15 Parsing and limits | Round-trip supported documents and malformed/oversized/deep/duplicate YAML/JSON; unknown versions | Canonical idempotence and decision equality for valid inputs; bounded validation rejection for invalid. No dropped unknown fields. |
+| T16 Generic writes | Insert candidate wrong tenant; update moves tenant; set drops protected field; nested set changes sibling; multi-target one denied | Deny and no mutation; correct where/check/fields facts. Delete checks pre-image. No trigger/schema changes before final authorization. |
+| T17 Adapter capabilities | Non-DTQL SQLite behind OpenVaultDB; opaque native ACL source; adapter lacks revisions | OVDB policies enforced on SQLite smoke; opaque lower denial stays authoritative; conditional remote writes unsupported without atomic revision capability. |
+| T18 Top-N sample | Sample 1/2 visible candidates, no IDs; targeted update includes forbidden columns | Deterministic IDs/order, evaluated count ≤N, denied write columns included; no writes; sample-only flag. Zero sample conditional. No inference about hidden rows; target principal's broader read rights do not widen requester's visibility. |
+| T19 Condition size/privacy | No rows, one private predicate and one expression over disclosure limit | Opaque private/too_large references; result remains conditional; no weakened/silently cut predicate; private policy only visible to owner admin. |
+
+## Test layers and run evidence
+
+WP1 conformance vectors specify exact request/decision examples; WP2 unit/property/fuzz tests; WP4–6 real adapter/HTTP tests; WP7 UI interaction tests; WP8 full browser vertical flow. Reuse existing DALgo tests and InGitDB temporary-repo fixtures. Version-pin all Go/TS modules in an E2E manifest; CI artifacts include sanitized requests/responses, layer revision traces, Git before/after and browser failure screenshots. Test assertions must verify all 13 mission proofs: T03(1,2,12), T04(3), T05/T06(4,5,6,13), T01/T02(7,8,9), T07(10,11).
+
+Pass gate: all mandatory T01–T19 checks at supported capabilities, no skipped reference InGitDB/UI cases, no credentials/row secrets in artifacts, and no forced best-effort adapter mode. Broader cloud/native sources may be explicitly out of profile, not silently skipped while claiming conformance.
+
+
+===== FILE 12-work-packages.md =====
+
+# Executable implementation plan and handoff
+
+Status: design work packages only. Do not start implementation or dispatch Corpus until human approval after independent review/reconciliation. Estimates below are relative effort/risk judgments, not measured hours or token costs. Re-audit pinned dependencies at implementation start.
+
+## Shared contract freeze
+
+| Contract | Freeze material | Human gate |
+|---|---|---|
+| C1 | Policy version/grammar, hierarchy, fields, privacy classification, legacy conversion (03) | Approve version namespace and preserve DALgo semantics. |
+| C2 | Operation descriptors, result/coverage/taxonomy, discover/CRUD/evaluate, plan/inspect/sample, omission rules (04) | Approve limits and diagnostic authority. |
+| C3 | Canonical realm/subject/actor, trusted context, private-policy admin, deployment identity profile (06/10) | Confirm hosted ADR reuse and self-hosted fixture profile. |
+| C4 | Provider/reader/manager/inspector contracts, capabilities, pure evaluation, errors (05) | Approve additive DALgo implementation home. |
+| C5 | Whole-record revision evidence, conditional write preconditions, short-operation policy snapshots (02/08) | Approve consistency limitations and remote evidence requirement. |
+| C6 | Structured query subset, key-targeted set-assignment UPDATE, final-image constraints and sample bounds | Approve a narrow real vertical slice and explicit unsupported behavior. |
+
+Freeze a reviewed contract revision and machine-readable golden vectors in DTQL; every downstream package references that exact revision. Later contract changes require coordinated review, not divergent implementation assumptions. No parser module extraction, new InGitDB HTTP server, custom ACL service or long-running transaction subsystem in these packages.
+
+## Dependency graph and order
+
+```text
+Human sign-off → WP0 baseline/pins → WP1 contract fixtures
+WP1 → WP2 DALgo model/evaluator → WP3 DALgo enforcement
+WP1 → WP4a InGitDB policy storage scaffolding
+WP1 → WP5a OpenVaultDB transport/store scaffolding
+WP1 → WP7a DataTug forms against shared contract fixtures
+WP3 + WP4a → WP4b InGitDB secured adapter/revisions
+WP3 + WP4b + WP5a → WP5b OpenVaultDB enforcement/HTTP driver
+WP3 + WP5b → WP6 DataTug daemon integration
+WP6 + WP7a → WP7b live DataTug UX
+WP4b + WP5b + WP6 + WP7b → WP8 vertical E2E/security → WP9 release/docs
+```
+
+Parallel work uses fixed contract fixtures and isolated worktrees. One writer per worktree. Avoid splitting `access` internals across competing branches until WP2 API stabilizes. Provider-first version releases, then one downstream bump per verified wave; no repeated uncoordinated library bumps. An implementation agent receiving a package must have the contract revision, affected files, dependency versions and tests below.
+
+## WP0 — Baselines, contracts and release topology
+
+Repos: all audited providers/consumers. Dependencies: human sign-off. Tasks: inspect current SHAs/AGENTS, identify current module versions and current NX targets without installing arbitrary latest tooling; inventory transitive adapters (especially `dalgo2openvaultdb`, InGitDB nested module); record compatibility matrix; confirm existing local/hosted auth integration owner; copy accepted source corrections into owner-doc update list. Run focused legacy suites once. Acceptance: reproducible pinned baseline and exact commands for subsequent package checks; stale duplicate OpenVaultDB clone excluded. Risk/effort: low-medium; module drift could invalidate API sketches. Do not broadly synchronize or change unrelated repositories.
+
+## WP1 — DTQL contract schemas and conformance fixtures
+
+Repos: `datatug/dtql` (normative spec), DALgo test consumer, DataTug TS fixture consumer. Dependencies: WP0 and C1–C6 decisions. Tasks: finalize C2 closed schema including optional plan-without-mutation, sample operation template, layer descriptors and restriction variants; produce JSON Schema for policies/requests/results/envelopes; generate valid and negative fixtures; canonical YAML expected bytes; compatibility vectors for legacy policy conversion; schema freshness/validation check. Preserve existing query schema unchanged. Acceptance: all fixture examples validate; duplicate-key/depth checks specified outside JSON Schema where necessary; semantic validators reject target/query mismatch and private metadata leaks; no prose/schema discrepancy. Tests: T04/T09/T15/T18/T19 fixtures and code-taxonomy exhaustiveness. Risk/effort: medium; avoid overengineering a generic schema generation framework.
+
+## WP2 — DALgo documents, principal snapshots and multi-decisions
+
+Repo: `dal-go/dalgo`, primarily `access/{document,principal,policy,context}.go` and DTO converter package. Depends WP1. Tasks: C1 strict decoder/serializer and editable AST; convert/compile into existing rules; structured binding/rule attribution; immutable verified principal adapter; add complete assessment/obligation types and pure policy adapter; preserve legacy `Policy`, `Decision`, `DeniedError` compatibility; bound caches. Acceptance: semantic/canonical round-trip, legacy unchanged decisions, structured multi-policy blockers and final/conditional distinction; no English parsing. Tests: focused access/document/principal/condition tests, property policy-order monotonicity, strict input fuzz corpus, import-boundary test. Risk/effort: medium-high due to residual semantics; review this before WP3.
+
+## WP3 — DALgo enforcement and shared dry run
+
+Repo: `dal-go/dalgo`, `access/{session,condition,fields,write}.go`, `condeval`, existing end2end access harness. Depends WP2. Tasks: shared plan/evidence assessment; collect independent blockers across policies/targets; query reference checks migrated from DataTug; before-paging row filters, conservative field bounds; pre/post image full touched-field validation including set removal/nested set; capability checks; no-data-read plan and bounded inspect; pure provider/custom handling. Acceptance: T01/T04/T07/T08/T10/T16 unit/recording-adapter behaviors; zero side effects on denial/dry run; existing tests pass. Tests: focused access+dtql+condeval, recording adapters, meaningful property/fuzz cases; one full provider suite before release. Risk/effort: high, core security critical. No new arbitrary SQL analyzer.
+
+## WP4a/b — InGitDB owner storage and enforcement
+
+Repos: `ingitdb/ingitdb-go` root config/schema, `ingitdb/dalgo2ingitdb`, relevant schema docs in `ingitdb-specs`. WP4a depends WP1; WP4b depends WP3+WP4a. Tasks: explicit enabled manifest, strict path-safe policy loader, owner admin provider/CRUD, revisions/CAS and Git persistence; integrate public constructor/transactions with secured facade; private enforcement evidence and owner-issued whole-record revisions; maintain schema capability forwarding; atomic revision checks under existing write lock. Acceptance: direct adapter and OVDB-mount semantics identical; policy reload and failed commit rollback; no policy-as-record exposure; T03/T05/T14/T16. Tests: existing CRUD/conformance/file-lock tests plus policy integrity and two-client revision-race tests. Risk/effort: high; nested module releases and wrapper interface loss. No server, cloud GitHub ACL write support or new locking architecture.
+
+## WP5a/b — OpenVaultDB and HTTP driver
+
+Repos: `openvaultdb/openvaultdb-go`, `openvaultdb/openvaultdb` docs, `dal-go/dalgo2openvaultdb`, optional `openvaultdb/ovdb` bootstrap config flags only. WP5a depends WP1; WP5b depends WP3+WP4b+WP5a. Tasks: own policy store; source registry and capability discovery; C2 routes and redaction; stable subject/actor mapping onto existing token store; control-plane admin grants, private policy visibility; collection-aware DTQL capability check; secured core/mount all paths; revision-bearing point read and atomic write precondition; typed driver result/error transport; bounds and sample endpoint. Acceptance: real HTTP three-blocker response, no owner-token override, CRUD revision/persistence, native source opacity and SQLite smoke, no writes in evaluate. Tests: auth/server/core/mount/driver tests, T07–T19 applicable cases, compatibility tests for old non-ACL clients. Risk/effort: high; existing error mapping and broad auth shortcuts must be audited route-by-route.
+
+## WP6 — DataTug daemon, provider reuse and secured connection
+
+Repo: `datatug/datatug-cli`. Depends WP3+WP5b. Tasks: reuse accesspolicies loader/run while removing duplicate enforcement and English attribution parsing; authenticated connection-scoped provider routes; own manifest persistence; principal context preservation; lower inspection despite upper static denial; remote conditional evidence and revision precondition; structured key UPDATE endpoint using existing connection path, leaving read-only builder invariant; safe sampling/condition return. Acceptance: same evaluator supports real operation and Explain, HTTP caller cannot use local no-policies/principal flags, stale evidence fails, T01–T08 and T11–T13. Tests: focused accesspolicies+server/API tests; trace no raw connection fallback. Risk/effort: medium-high; legacy execution path and newer spec not necessarily identical implementations.
+
+## WP7a/b — DataTug browser policy workspace and record edit
+
+Repo: `datatug/datatug-apps`. WP7a depends WP1, WP7b depends WP6+WP7a. Tasks: owner/layer list, policy form preserving full supported AST, read-only custom/private projection, admin capability checks as UI hints, ETag save/conflict/reload; Explain plan/IDs/top-N selectors and principal/simulation controls; structured blockers and private/too-large restrictions; stale revision markers; simple key-targeted record-edit path. Acceptance: all visible UI states match C2; no browser evaluator, owner credentials or simulated execution; edits persist at owner; inaccessible policies absent/generic. Tests: NX-discovered unit/component targets, keyboard/status accessibility, HTTP contract fixtures, T05/T06/T09/T18/T19. Risk/effort: medium; full native query-builder redesign is not needed.
+
+## WP8 — Real vertical acceptance and security verification
+
+Repos: DataTug E2E harness plus existing OpenVaultDB/InGitDB conformance harnesses. Depends WP4b/5b/6/7b. Tasks: provision fixture tokens/current membership/policies, real services and Git data, execute T01–T19, capture sanitized artifacts; verify policy edit→restart/reconnect→conditions/inspect/sample→query→UPDATE; simulate stale data/policy and unavailable providers; separate direct-lower routes. Acceptance: all mandatory tests pass with actual storage and no mocked lower decisions, no skipped critical cases; meaningful evidence of no denied writes. Tests: one complete vertical run plus focused reruns on actual changes/failures, not repeated fleet scans. Risk/effort: medium-high; E2E harness integration is enabling work, not optional polish.
+
+## WP9 — Documentation, release and approved handoff completion
+
+Repos: all owner docs and module consumers. Depends WP8. Tasks: update DALgo stale access docs/spec status, OpenVaultDB stale auth/DTQL docs, InGitDB root config docs/server direction, DataTug feature specs; publish DTQL schemas under approved namespace; pin provider releases in dependency order; retain release matrix and migration examples. Conformance claim is version/profile-specific. Acceptance: package versions and supported capabilities documented, legacy disabled behavior tested, no canonical spec claims that contradict code. Use repository-required specification tooling where available; do not silently rewrite unrelated existing decisions. Risk/effort: low-medium.
+
+## Scope ledger
+
+MVP: owner policy persistence/discovery/read/edit; users/roles/groups; public default; all-layer query and key UPDATE; structured blockers; plan/IDs/bounded sample; opaque condition references; custom read-only pure policy; actual E2E. Enabling: whole-row revision contract, DALgo hidden-reference checks, typed HTTP errors, stable actor/subject resolver, tests/schema fixtures. Follow-up: richer forms/raw editor, more write operators/bulk mutation, cloud adapter policy editing, policy import tooling, native ACL import. Future: custom ACL service and logical change sets. Out of scope: standalone InGitDB server, new auth protocol, arbitrary SQL authorization parser, distributed/global transactions, approval workflow engine, cross-source atomic mutation, billing and marketing implementation.
+
+
+===== FILE 13-decisions.md =====
+
+# Decision log and human checkpoint
+
+All architecture recommendations remain proposed unless explicitly directed by the user below. No implementation sign-off has been received.
+
+| ID | Decision / recommendation | Alternatives and rationale | Status |
+|---|---|---|---|
+| D01 | DTQL owns policy and wire contract; DALgo evolves existing implementation | A new ACL language/evaluator duplicates shipped hierarchy, predicates, codecs and tests. No module extraction needed merely to change spec ownership. | User core direction; implementation location proposed |
+| D02 | Retain DALgo most-specific precedence, deny on equal specificity, cross-policy intersection | Global deny-first inside every policy would silently invalidate reopening semantics. New version could later introduce another profile; not MVP. | Human approve C1 |
+| D03 | YAML/JSON reuse, `dtql.org/access/v1`, same condition vocabulary | New text grammar costs parser/editor work; legacy-only namespace leaves portable ownership unclear. Dual-version explicit conversion avoids silent breaking change. | Human approve namespace/migration |
+| D04 | Existing field allow-lists; UI deny-column intent becomes explicit allow-list restriction | Conditional deny and field deny syntax is not in current DALgo. Introducing it requires negation/conflict semantics. New schema fields remain denied until granted. | Proposed; human approve C1 |
+| D05 | Stable existing internal identity, shared hosted Sneat Firebase UID; self-hosted realm resolver | Provider subject/email policies would require rewrites. A second hosted OpenVaultDB ID conflicts with approved ADR 0004. | Preserve approved existing decision |
+| D06 | OpenVaultDB is remote server for InGitDB; InGitDB adapter owns policies | Restoring removed InGitDB server duplicates serving/auth responsibilities. User supports separation and cross-product promotion; marketing implementation out of scope. | User-confirmed during design |
+| D07 | DALgo policy provider/reader; OpenVaultDB discovery/read/CRUD endpoints | Copying all policies to DataTug makes stale state authoritative and loses owner control. Policies may stay private while evaluators return safe outcomes. | User-confirmed API direction |
+| D08 | Shared dry run with no-row plan, key inspection, bounded top-N sampling | A Boolean preflight cannot explain row predicates; full execution/rollback is unsafe and may trigger effects. Explicit modes disclose what was inspected. | User-requested; bounded mechanics proposed |
+| D09 | No-row dry run returns admission conditions or private/too-large opaque references | Negating/flattening predicates explodes complexity and risks leaks. Per-policy expression plus cross-policy conjunction preserves exact semantics. | User-requested |
+| D10 | **Policies public by default**, explicit private admin-only visibility | Private-by-default was initially proposed and explicitly overridden by user. Public means authenticated policy-discovery/read authorization, not anonymous Internet publication. Private hides identity/text/conditions/references from non-admins. Changing classification requires owner admin. | User-directed default; authenticated interpretation stated |
+| D11 | Actor scope AND subject policy authority; owner control-plane bypass cannot bypass data ACL | Reusing owner credentials for ordinary DataTug requests would make application and lower-layer bounds ineffective. | Human approve C3/bootstrap |
+| D12 | Collect safe independent blockers, mark inaccessible/unsupported work partial | First-error only fails mission; unbounded/full hidden-row enumeration leaks data and inflates cost. A privacy-coalesced response may hide several internal facts. | Proposed C2 |
+| D13 | Remote conditional write requires whole-record CAS and readable required evidence | Stacking current buffered remote wrappers is race-prone. Remote predicate delegation/transactions would be much larger. Write-only conditional remote access needing hidden evidence fails closed in MVP. | Human approve C5 limitation |
+| D14 | Supported structured read plus key-targeted typed UPDATE, not SQL mutation parser | Real UPDATE still exercises action/table/row/field/post-image control. Arbitrary SQL and bulk predicate mutation grow MVP unnecessarily. Existing read-only builder stays intact. | Human approve C6 |
+| D15 | Per-owner short-operation immutable policy snapshots, reauthorize actual execution | Globally simultaneous policy snapshots need cross-layer coordination. In-flight short operations may complete under an admitted snapshot; edits affect later admissions. | Human approve consistency semantics |
+| D16 | Round-trip semantic fidelity and canonical idempotence; no comment formatting preservation | Lossless concrete syntax tree adds editor complexity. Existing style can be normalized with explicit UI notice. Unknown/custom policies remain read-only. | Human approve C1 |
+| D17 | Reference vertical slice self-hosted preprovisioned identities; hosted login infrastructure reused later | Building account linking/OIDC issuance here would overtake ACL scope. Runtime users/roles/groups still exercised through actual auth. | Human approve deployment profile |
+
+## Decisions that must not be left to divergent implementation agents
+
+Approve C1–C6 together after the independent reviews. In particular: exact new version namespace; stricter public-profile query restrictions vs legacy DALgo; field deny intent as allow-list; public visibility meaning and private admin grant; remote evidence/CAS limitations; policy admission/revocation semantics; and sample result/limits. Reconciler should distinguish concrete contradictions requiring edits from these intentional trade-offs. Accepting a recommendation is not permission to implement the entire future scope.
+
+## Owner documentation corrections
+
+DALgo access docs and older feature prose: mark shipped predicates/fields, singular legacy decision limitations and new negotiated profile. OpenVaultDB README/threat-model/DTQL comments: reconcile actual bearer auth, current capabilities and new data enforcement. InGitDB docs/AGENTS package map: preserve removed server decision and document actual adapter/config modules. DataTug CLI specs: existing query Explain vs new shared multi-layer API; public profile cannot use CLI simulation flags as authority. Each correction belongs in WP9 (or alongside affected implementation), with exact baseline evidence from 01.
+
+
+===== FILE 14-future.md =====
+
+# Bounded future compatibility notes
+
+## Long-running logical transactions / change sets
+
+Out of scope: no persistence, distributed ACID, locking design, conflict resolution, recovery, approvals or transaction protocol here.
+
+Today's request/result shape need not prevent future staged operations. Stable operation IDs and per-operation blockers can represent multiple blocked operations; policy/identity revisions distinguish a historical assessment from current authority. Staging authorization must remain advisory: a future commit would need authorization against current effective policies and current principal/membership, not a replayed allow from stage time. Persist references to subject/actor and the context needed to re-resolve identity, not reusable bearer tokens or frozen role grants. Policy changes before commit may invalidate staged results. `where/check` already separates existing-row admission and candidate post-image constraints. No field in the MVP should claim that a dry-run result is a durable authorization lease.
+
+No further long-running transaction design is necessary to ship this ACL slice.
+
+## External/custom ACL provider
+
+Existing DALgo `Policy` is already the application extension. C4 separates Describe/Snapshot, read/edit and Inspector so a future service may supply decisions/restrictions while retaining owner/source/revision attribution and remaining read-only in DataTug. Unknown/unavailable required providers fail closed and explicit capability negotiation prevents pretending opaque code can be serialized or inspected. Request IDs, bounded operations, stable reason codes and redaction apply equally.
+
+MVP implements only local application policies and current owner adapters. A remote ACL service would later need its own authenticated trust/availability/consistency and resource-budget review; no service, deployment, caching protocol or cross-source transaction architecture is added now.
+
+
+===== FILE audit-snapshots.json =====
+
+[
+  {
+    "repo": "datatug/dtql",
+    "head": "69f7a1a144d2563a5f85ee80f95881a5e13b4082",
+    "branch": "main",
+    "origin": "https://github.com/datatug/dtql.git",
+    "status": ""
+  },
+  {
+    "repo": "datatug/dtql-go",
+    "head": "e20e20322f90ff809cd0e1b2fc95641ca7e1f870",
+    "branch": "main",
+    "origin": "https://github.com/datatug/dtql-go.git",
+    "status": ""
+  },
+  {
+    "repo": "dal-go/dalgo",
+    "head": "6b0be09b95bd3afc90309763671791e17264dffe",
+    "branch": "main",
+    "origin": "https://github.com/dal-go/dalgo.git",
+    "status": ""
+  },
+  {
+    "repo": "dal-go/dalgo4auth",
+    "head": "068f962057ca96f051abd461438d92e169ae5e07",
+    "branch": "main",
+    "origin": "https://github.com/dal-go/dalgo4auth.git",
+    "status": ""
+  },
+  {
+    "repo": "ingitdb/ingitdb-go",
+    "head": "95a40667759cc86e88e1b6714070584e0e794c08",
+    "branch": "main",
+    "origin": "https://github.com/ingitdb/ingitdb-go.git",
+    "status": ""
+  },
+  {
+    "repo": "ingitdb/dalgo2ingitdb",
+    "head": "7a6a2a5d3bfb179919ed081c2a6db6305d030bba",
+    "branch": "main",
+    "origin": "https://github.com/ingitdb/dalgo2ingitdb.git",
+    "status": ""
+  },
+  {
+    "repo": "ingitdb/ingitdb-cli",
+    "head": "ac1ec35accb05ea491a647a84b6c32f349bd4503",
+    "branch": "main",
+    "origin": "https://github.com/ingitdb/ingitdb-cli.git",
+    "status": ""
+  },
+  {
+    "repo": "ingitdb/ingitdb-specs",
+    "head": "01c249c2503fa372ee747bae784d69556ef36d96",
+    "branch": "main",
+    "origin": "https://github.com/ingitdb/ingitdb-specs.git",
+    "status": ""
+  },
+  {
+    "repo": "openvaultdb/openvaultdb",
+    "head": "ea9858d78b4c4c8151af0972741ea520dc581190",
+    "branch": "main",
+    "origin": "https://github.com/openvaultdb/openvaultdb.git",
+    "status": ""
+  },
+  {
+    "repo": "openvaultdb/openvaultdb-go",
+    "head": "3317ee519f4e8ff5240caa54e5e9b20c011525e2",
+    "branch": "main",
+    "origin": "https://github.com/openvaultdb/openvaultdb-go.git",
+    "status": ""
+  },
+  {
+    "repo": "openvaultdb-org/openvaultdb-go",
+    "head": "21ab0e2fd0b83ca4816b1b8a470793783a103c57",
+    "branch": "main",
+    "origin": "https://github.com/openvaultdb/openvaultdb-go.git",
+    "status": ""
+  },
+  {
+    "repo": "dal-go/dalgo2openvaultdb",
+    "head": "6038ad534b9d77e4213233857a6387cc0c34fa34",
+    "branch": "main",
+    "origin": "https://github.com/dal-go/dalgo2openvaultdb.git",
+    "status": ""
+  },
+  {
+    "repo": "datatug/datatug-cli",
+    "head": "a913de4fd6455e35d2cf9b4f54c4bb5ed36bb4fe",
+    "branch": "main",
+    "origin": "https://github.com/datatug/datatug-cli.git",
+    "status": ""
+  },
+  {
+    "repo": "datatug/datatug-apps",
+    "head": "38155e6e7e7870c3a21665f997812d623b88f1c2",
+    "branch": "main",
+    "origin": "https://github.com/datatug/datatug-apps.git",
+    "status": ""
+  }
+]
+
+
+===== FILE reviews/rubric.md =====
+
+# Independent review protocol and identical rubric
+
+Review the frozen packet manifest and files 01–14, README and audit-snapshots. Reviewers receive the same source excerpts/snapshot references and user-direction log. Do not read the other review or reconciliation. Do not change the packet. Return findings, not implementation. Claims based on source should cite the packet document/section or exact repository path/symbol. Distinguish measured facts, code-inspection inferences and design preferences.
+
+Reviewers: Astra B (independent frontier architecture review) and Opus. Capture exact executed model when returned by tooling. Never substitute another model and label it Opus. Run in parallel with the same frozen digest. Review completion does not authorize implementation.
+
+## Assessment dimensions
+
+Correctness; security; completeness; unnecessary complexity; reuse of existing architecture; DTQL/DALgo boundary; identity/actor/subject; layered enforcement; discovery/privacy/editability; structured blockers and completeness; plan/key/sample dry run and private/too-large conditions; DataTug UX; implementation feasibility; testability; MVP scope; future extensibility without scope creep.
+
+Explicitly check the difficult cases: lower blockers after upper denial without mutation; row evidence confidentiality; sample not proving all records; private policies admin-only despite generic diagnostics grants; public-by-default user direction; remote read/write race and whole-row CAS; per-owner policy snapshot semantics; no-data-read plan; independent owner admin; conservative field alternatives; existing DALgo first-match hierarchy/legacy behavior; no separate InGitDB server.
+
+## Required output
+
+1. Verdict: ready, ready with changes, or not ready for implementation, with short rationale.
+2. Findings table with stable IDs prefixed `A-` or `O-`: severity (`critical`, `high`, `medium`, `low`, `out-of-scope/future`), dimension, exact evidence, concrete failure/example, recommended action, and whether it blocks contract freeze. Avoid reporting the same root cause multiple times as independent value.
+3. Missing human decisions and disputed trade-offs; say which are choices rather than bugs.
+4. Reuse/scope assessment and up to three things explicitly worth preserving.
+5. Limits of review and uncertainty. No claims to have run tests not actually run. No fabricated token/cost telemetry.
+
+Severity: critical = plausible cross-boundary unauthorized access/data loss with no viable current contract; high = major security/correctness gap or implementation-blocking ambiguity; medium = meaningful reliability/interop/test gap with bounded fix; low = clarity/minor maintainability; future = outside current MVP, not a blocker merely for being absent.
+
+## Separate reconciliation instructions
+
+A separate agent (neither author nor reviewers) receives both sealed reviews and the frozen packet. De-duplicate and classify each root finding as consensus, complementary, conflicting, duplicate, incorrect/unsupported or optional. Assess severity/value and accept/reject/defer with rationale. Compare trade-offs for conflicts; do not invent a third architecture unless both options demonstrably fail. Flag human choices. Produce an actionable human report with accepted changes by work package and readiness verdict. The author may implement accepted **document** fixes, with a revision/change ledger, but no MVP code.
+
+Meta-evaluation must identify each reviewer's unique useful findings, misses and assessable false positives; semantic overlap; whether Opus alone likely sufficed; incremental Astra value and future role-dependent workflow recommendation. This is one-project evidence, not universal model ranking. “Accepted” means reconciler recommendation until the human signs off.
+
+## Cost/value metrics
+
+For each reviewer and reconciler record exact model, request start/end and elapsed, input/output/cache tokens and total (with counting definition), actual reported USD or explicitly unavailable. Separate API-reported cost from an actual subscription invoice. Do not infer a missing zero or invent pricing. If telemetry isn't exposed, mark unavailable; optionally a labeled estimate with method, but avoid distracting pseudo-precision.
+
+Overlap: after semantic deduplication let C = root findings independently raised by both; A/O = each review's root-finding count. Report Jaccard `C/(A+O−C)` and coverage overlap `C/min(A,O)` with numerator/denominator. Counts also include accepted findings, unique accepted, critical/high accepted. Cost per accepted = reported cost / accepted roots; per unique accepted similarly, undefined when zero or cost unavailable. Incremental Astra value = its unique accepted findings and severity relative to cost, plus useful independent corroboration separately. Do not count stylistic duplication as a second discovery. Capture limits of assessability and any runtime retry costs in the durable report.
+
+
+===== FILE reviews/source-evidence.md =====
+
+# Shared source evidence excerpts
+
+Exact local revisions are in audit-snapshots.json. Line numbers name inspected source, not proposed changes.
+
+## dal-go/dalgo/access/policy.go:25
+
+```
+25: 	Resources []Resource
+26: 	// Query retains the structured or opaque query for custom policies and
+27: 	// future predicate, projection, index, and cost constraints. It is nil for
+28: 	// non-query operations; v1 declarative policies authorize query sources.
+29: 	Query dal.Query
+30: }
+31: 
+32: // Decision explains an access-policy result.
+33: type Decision struct {
+34: 	Allowed      bool
+35: 	Operation    Operations
+36: 	Resource     Resource
+37: 	Policy       string
+38: 	PolicySource string
+39: 	Rule         string
+40: 	Effect       string
+41: 	Explanation  string
+42: 	// Condition is the source text of the row condition behind a conditional
+43: 	// decision, with parameter names rather than resolved values.
+44: 	Condition string
+45: 	// Residuals holds, per request resource (same index as Request.Resources),
+46: 	// the resolved row condition the caller must still enforce before the
+47: 	// operation is complete: after the read for point operations, by query
+48: 	// rewrite for Query. A nil entry means the resource is allowed outright.
+49: 	// Residuals is nil for an unconditional decision.
+50: 	Residuals []dal.Condition
+51: 	// Writes holds, per request resource, the ordered alternatives that decide
+52: 	// a write on that resource (see WriteResidual). A nil entry means the write
+53: 	// is allowed outright, with no row or post-image constraint.
+54: 	Writes []*WriteResidual
+55: }
+56: 
+57: // WriteAlternative is one allow rule as it applies to a write. Where selects
+58: // the rows (by pre-image) the rule applies to; nil means every row. Check is
+59: // what the row must satisfy after the write; nil means no constraint. Both are
+60: // resolved conditions; the Text fields keep the source form with parameter
+61: // names for explanations.
+62: type WriteAlternative struct {
+63: 	Rule      string
+64: 	Where     dal.Condition
+65: 	Check     dal.Condition
+66: 	WhereText string
+67: 	CheckText string
+68: 	// Fields is the rule's allow-list of field patterns; nil means every field.
+69: 	Fields []string
+70: 	fields *fieldSet
+71: }
+72: 
+73: // WriteResidual is what the secured wrapper enforces on a write: the
+74: // conditional alternatives in precedence order, then Terminal — the first
+75: // unconditional rule when it is an allow (possibly with a Check) — or nil when
+76: // the walk ends in a deny or in no rule at all. The first alternative whose
+77: // Where holds on the pre-image decides the write; a new row (Insert, or Set of
+78: // a missing row) is admitted by the first alternative whose Check it satisfies.
+79: type WriteResidual struct {
+80: 	Alternatives []WriteAlternative
+81: 	Terminal     *WriteAlternative
+82: }
+83: 
+84: // DeniedError is returned when a policy rejects an operation.
+85: type DeniedError struct {
+86: 	Decision Decision
+87: }
+88: 
+89: func (e *DeniedError) Error() string {
+90: 	policy := fmt.Sprintf("policy=%q", e.Decision.Policy)
+91: 	if e.Decision.PolicySource != "" {
+92: 		policy += fmt.Sprintf(" source=%q", e.Decision.PolicySource)
+93: 	}
+94: 	rule := ""
+95: 	if e.Decision.Rule != "" {
+96: 		rule = fmt.Sprintf(" rule=%q", e.Decision.Rule)
+97: 	}
+98: 	return fmt.Sprintf("%v: %s%s operation=%s resource=%s: %s", ErrAccessDenied,
+99: 		policy, rule, e.Decision.Operation, e.Decision.Resource, e.Decision.Explanation)
+100: }
+101: 
+102: func (e *DeniedError) Unwrap() error { return ErrAccessDenied }
+103: 
+104: // Policy is a named access capability. Every Policy applied to a secured
+105: // request must allow every target resource.
+106: type Policy interface {
+107: 	Name() string
+108: 	Decide(context.Context, Request) Decision
+109: 	Authorize(context.Context, Request) error
+110: }
+111: 
+112: // AccessPolicy is the declarative hierarchical Policy implementation.
+113: type AccessPolicy struct {
+```
+
+## dal-go/dalgo/access/policy.go:183
+
+```
+183: 				writes = make([]*WriteResidual, len(request.Resources))
+184: 			}
+185: 			writes[i] = last.Writes[0]
+186: 		}
+187: 	}
+188: 	last.Residuals = residuals
+189: 	last.Writes = writes
+190: 	return last
+191: }
+192: 
+193: func (p *AccessPolicy) decideResource(resolver variableResolver, operation Operations, resource Resource) Decision {
+194: 	matching := matchingRules(p.compiled, operation, resource)
+195: 	if len(matching) == 0 {
+196: 		return Decision{
+197: 			Operation:    operation,
+198: 			Resource:     resource,
+199: 			Policy:       p.name,
+200: 			PolicySource: p.source,
+201: 			Effect:       effectDeny.String(),
+202: 			Explanation:  "no matching allow rule",
+203: 		}
+204: 	}
+205: 	// Walk matches in precedence order: conditional allows met before the first
+206: 	// unconditional rule apply to the rows their conditions select; the first
+207: 	// unconditional rule settles everything else. An unconditional allow makes
+208: 	// the collected conditions moot; a deny (or no unconditional rule at all)
+209: 	// leaves their disjunction as the residual the caller must enforce.
+210: 	var conditional []compiledRule
+211: 	var terminal *compiledRule
+212: 	for i := range matching {
+213: 		if matching[i].where == nil {
+214: 			terminal = &matching[i]
+215: 			break
+216: 		}
+217: 		conditional = append(conditional, matching[i])
+218: 	}
+219: 	if len(conditional) == 0 && (terminal.effect != effectAllow || (terminal.check == nil && terminal.fields == nil)) {
+220: 		allowed := terminal.effect == effectAllow
+221: 		return Decision{
+222: 			Allowed:      allowed,
+223: 			Operation:    operation,
+224: 			Resource:     resource,
+225: 			Policy:       p.name,
+226: 			PolicySource: p.source,
+227: 			Rule:         terminal.name,
+228: 			Effect:       terminal.effect.String(),
+229: 			Explanation:  fmt.Sprintf("matched rule %q (%s)", terminal.name, terminal.effect),
+230: 		}
+231: 	}
+232: 	// Resolve every alternative once; an unresolved parameter denies.
+233: 	write := &WriteResidual{}
+234: 	for _, rule := range conditional {
+235: 		alternative, err := p.resolveAlternative(resolver.withCaptures(captureValues(rule.pattern, resource)), rule)
+236: 		if err != nil {
+237: 			return p.denyUnresolved(operation, resource, rule, err)
+238: 		}
+239: 		write.Alternatives = append(write.Alternatives, alternative)
+240: 	}
+241: 	if terminal != nil && terminal.effect == effectAllow {
+242: 		alternative, err := p.resolveAlternative(resolver.withCaptures(captureValues(terminal.pattern, resource)), *terminal)
+243: 		if err != nil {
+244: 			return p.denyUnresolved(operation, resource, *terminal, err)
+245: 		}
+246: 		write.Terminal = &alternative
+247: 	}
+248: 	decision := Decision{
+249: 		Allowed:      true,
+250: 		Operation:    operation,
+251: 		Resource:     resource,
+252: 		Policy:       p.name,
+253: 		PolicySource: p.source,
+254: 		Effect:       effectAllow.String(),
+255: 		Writes:       []*WriteResidual{write},
+256: 	}
+257: 	if len(conditional) == 0 {
+258: 		// A terminal allow with only a post-image check or a fields list:
+259: 		// reads are unconditional on rows.
+260: 		decision.Rule = terminal.name
+261: 		decision.Explanation = fmt.Sprintf("matched rule %q (allow)", terminal.name)
+262: 		if terminal.check != nil {
+263: 			decision.Condition = terminal.check.String()
+264: 			decision.Explanation = fmt.Sprintf("matched rule %q (allow; check: %s)", terminal.name, decision.Condition)
+265: 		}
+266: 		return decision
+267: 	}
+268: 	names := make([]string, 0, len(conditional))
+269: 	texts := make([]string, 0, len(conditional))
+270: 	parts := make([]dal.Condition, 0, len(conditional))
+271: 	for _, alternative := range write.Alternatives {
+272: 		names = append(names, alternative.Rule)
+273: 		texts = append(texts, alternative.WhereText)
+274: 		parts = append(parts, alternative.Where)
+275: 	}
+276: 	if write.Terminal != nil {
+277: 		// An unconditional allow makes the row conditions moot for reads.
+278: 		decision.Rule = write.Terminal.Rule
+279: 		decision.Explanation = fmt.Sprintf("matched rule %q (allow)", write.Terminal.Rule)
+280: 		return decision
+281: 	}
+282: 	residual, text := parts[0], texts[0]
+283: 	if len(parts) > 1 {
+284: 		residual = dal.NewGroupCondition(dal.Or, parts...)
+285: 		text = "(" + strings.Join(texts, " OR ") + ")"
+286: 	}
+287: 	decision.Rule = strings.Join(names, ", ")
+288: 	decision.Condition = text
+289: 	decision.Explanation = fmt.Sprintf("matched conditional rule(s) %s (where: %s)", quoteAll(names), text)
+290: 	decision.Residuals = []dal.Condition{residual}
+291: 	return decision
+```
+
+## dal-go/dalgo/access/policy.go:350
+
+```
+350: 	return &DeniedError{Decision: decision}
+351: }
+352: 
+353: func matchingRules(rules []compiledRule, operation Operations, resource Resource) []compiledRule {
+354: 	matches := make([]compiledRule, 0, len(rules))
+355: 	for _, rule := range rules {
+356: 		if !rule.operations.contains(operation) || !ruleMatchesResource(rule, resource) {
+357: 			continue
+358: 		}
+359: 		matches = append(matches, rule)
+360: 	}
+361: 	sort.SliceStable(matches, func(i, j int) bool {
+362: 		left, right := matches[i], matches[j]
+363: 		if left.depth != right.depth {
+364: 			return left.depth > right.depth
+365: 		}
+366: 		if left.literals != right.literals {
+367: 			return left.literals > right.literals
+368: 		}
+369: 		if left.effect != right.effect {
+370: 			return effectIsRestrictive(left.effect)
+371: 		}
+372: 		return left.name < right.name
+373: 	})
+374: 	return matches
+375: }
+```
+
+## dal-go/dalgo/access/principal.go:10
+
+```
+10: 
+11: // Principal identifies the caller for principal bindings and for the
+12: // $currentUser, $principal.roles and $principal.groups variables. Roles and
+13: // groups are opaque strings the host assigns; DALgo never looks them up.
+14: type Principal struct {
+15: 	ID     any
+16: 	Roles  []string
+17: 	Groups []string
+18: }
+19: 
+20: type contextPrincipalKey struct{}
+21: 
+22: // WithPrincipal returns a child context carrying the caller's principal. It
+23: // replaces any principal inherited from the parent context.
+24: func WithPrincipal(ctx context.Context, principal Principal) context.Context {
+25: 	if ctx == nil {
+26: 		panic("access: nil context")
+27: 	}
+28: 	return context.WithValue(ctx, contextPrincipalKey{}, principal)
+29: }
+30: 
+31: // PrincipalFrom returns the principal carried by ctx, if any.
+32: func PrincipalFrom(ctx context.Context) (Principal, bool) {
+33: 	if ctx == nil {
+34: 		return Principal{}, false
+35: 	}
+36: 	principal, ok := ctx.Value(contextPrincipalKey{}).(Principal)
+37: 	return principal, ok
+38: }
+39: 
+40: // Bindings map principals to named rule sets. A binding value is a list of
+41: // rule-set names; Everyone applies to every principal, including an absent one.
+42: type Bindings struct {
+43: 	Roles    map[string][]string
+44: 	Groups   map[string][]string
+45: 	Users    map[string][]string
+46: 	Everyone []string
+47: }
+48: 
+49: // PrincipalPolicySet is a Policy that derives the caller's authority from
+50: // who they are: the rule sets bound to the principal's ID, roles and groups
+51: // (plus Everyone) are unioned and compiled as one AccessPolicy, so the parent
+52: // feature's precedence resolves overlaps between bindings; that single policy
+53: // then takes part in the ordinary intersection with database and context
+54: // policies, so a binding can never widen what another policy denies.
+55: type PrincipalPolicySet struct {
+56: 	name     string
+57: 	source   string
+58: 	ruleSets map[string][]Rule
+59: 	bindings Bindings
+60: 
+61: 	mu    sync.Mutex
+62: 	cache map[string]*AccessPolicy
+63: }
+64: 
+65: // NewPrincipalPolicySet validates that every binding names an existing rule
+```
+
+## dal-go/dalgo/access/context.go:145
+
+```
+145: func (g guard) authorizeWrite(ctx context.Context, operation Operations, resources ...Resource) ([][]writeResidual, error) {
+146: 	_, writes, err := g.authorizeRequest(ctx, Request{Operation: operation, Resources: resources})
+147: 	return writes, err
+148: }
+149: 
+150: // authorizeRequest evaluates every applicable policy and returns, per request
+151: // resource, the read residuals and the write residuals the caller must still
+152: // enforce. A denial by any policy is returned immediately.
+153: func (g guard) authorizeRequest(ctx context.Context, request Request) ([][]residual, [][]writeResidual, error) {
+154: 	dynamicPolicies := policiesFromContext(ctx)
+155: 	contextPolicyCount := len(g.boundPolicies) + len(dynamicPolicies)
+156: 	if err := g.requireContextPolicy(request.Operation, contextPolicyCount); err != nil {
+157: 		return nil, nil, err
+158: 	}
+159: 	policies := make([]Policy, 0, len(g.databasePolicies)+contextPolicyCount)
+160: 	policies = append(policies, g.databasePolicies...)
+161: 	policies = append(policies, g.boundPolicies...)
+162: 	policies = append(policies, dynamicPolicies...)
+163: 	var residuals [][]residual
+164: 	var writes [][]writeResidual
+165: 	for _, policy := range policies {
+166: 		decision := policy.Decide(ctx, request)
+167: 		if !decision.Allowed {
+168: 			return nil, nil, &DeniedError{Decision: decision}
+169: 		}
+170: 		for i, condition := range decision.Residuals {
+171: 			if condition == nil || i >= len(request.Resources) {
+172: 				continue
+173: 			}
+174: 			if residuals == nil {
+175: 				residuals = make([][]residual, len(request.Resources))
+176: 			}
+177: 			residuals[i] = append(residuals[i], residual{
+178: 				policy:       decision.Policy,
+179: 				policySource: decision.PolicySource,
+180: 				rule:         decision.Rule,
+181: 				text:         decision.Condition,
+182: 				resource:     request.Resources[i],
+183: 				condition:    condition,
+184: 			})
+185: 		}
+186: 		for i, write := range decision.Writes {
+187: 			if write == nil || i >= len(request.Resources) {
+188: 				continue
+189: 			}
+190: 			if writes == nil {
+191: 				writes = make([][]writeResidual, len(request.Resources))
+192: 			}
+193: 			writes[i] = append(writes[i], writeResidual{
+194: 				policy:       decision.Policy,
+195: 				policySource: decision.PolicySource,
+196: 				resource:     request.Resources[i],
+197: 				residual:     write,
+198: 			})
+199: 		}
+200: 	}
+201: 	return residuals, writes, nil
+202: }
+203: 
+204: func (g guard) checkContext(ctx context.Context) error {
+205: 	return g.requireContextPolicy(0, len(g.boundPolicies)+len(policiesFromContext(ctx)))
+206: }
+207: 
+208: func (g guard) requireContextPolicy(operation Operations, contextPolicyCount int) error {
+209: 	if !g.requireContext || contextPolicyCount > 0 {
+210: 		return nil
+211: 	}
+212: 	return &DeniedError{Decision: Decision{
+213: 		Operation:   operation,
+214: 		Policy:      "context",
+215: 		Effect:      effectDeny.String(),
+216: 		Explanation: "a context-bound access policy is required",
+217: 	}}
+218: }
+```
+
+## dal-go/dalgo/access/write.go:55
+
+```
+55: func (s securedWriteSession) enforceWrites(ctx context.Context, operation Operations, writes [][]writeResidual, targets []writeTarget) error {
+56: 	if len(writes) == 0 {
+57: 		return nil
+58: 	}
+59: 	for i, target := range targets {
+60: 		perResource := writes[i]
+61: 		if len(perResource) == 0 {
+62: 			continue
+63: 		}
+64: 		images, err := s.writeImages(ctx, operation, target, perResource[0])
+65: 		if err != nil {
+66: 			return err
+67: 		}
+68: 		for _, w := range perResource {
+69: 			if err := evaluateWrite(operation, images, w); err != nil {
+70: 				return err
+71: 			}
+72: 		}
+73: 	}
+74: 	return nil
+75: }
+76: 
+77: // writeImages reads the pre-image (inside the caller's transaction) and
+78: // computes the post-image for one target.
+79: func (s securedWriteSession) writeImages(ctx context.Context, operation Operations, target writeTarget, w writeResidual) (writeImages, error) {
+80: 	var images writeImages
+81: 	if operation != Insert {
+82: 		reader, ok := s.session.(dal.ReadSession)
+83: 		if !ok {
+84: 			return images, w.deny(operation, "", "", "a conditional write needs a session that can read the row's pre-image")
+85: 		}
+86: 		shadow := record.NewRecordWithData(target.key, &map[string]any{})
+87: 		if err := reader.Get(ctx, shadow); err != nil {
+88: 			return images, err
+89: 		}
+90: 		if shadow.Exists() {
+91: 			images.exists = true
+92: 			images.pre = *shadow.Data().(*map[string]any)
+93: 		}
+94: 	}
+95: 	images.updates = target.updates
+96: 	switch operation {
+97: 	case Insert, Set:
+98: 		post, err := condeval.ToMap(target.data)
+99: 		if err != nil {
+100: 			return images, w.deny(operation, "", "", fmt.Sprintf("row data could not be evaluated: %v", err))
+101: 		}
+102: 		images.post = post
+103: 	case Update:
+104: 		if images.exists {
+105: 			post := condeval.CloneMap(images.pre)
+106: 			if err := condeval.ApplyUpdates(post, target.updates); err != nil {
+107: 				return images, w.deny(operation, "", "", fmt.Sprintf("post-image could not be computed: %v", err))
+108: 			}
+109: 			images.post = post
+110: 		}
+111: 	}
+112: 	return images, nil
+113: }
+114: 
+115: // evaluateWrite applies one policy's write residual. The first alternative
+116: // whose Where holds on the pre-image decides an Update, Set of an existing row
+117: // or Delete; a new row is admitted by the first alternative whose Check it
+118: // satisfies; the Terminal allow applies when no alternative does.
+119: func evaluateWrite(operation Operations, images writeImages, w writeResidual) error {
+120: 	r := w.residual
+121: 	isNewRow := operation == Insert || (operation == Set && !images.exists)
+122: 	if isNewRow {
+123: 		for _, alternative := range r.Alternatives {
+124: 			check, checkText := alternativeCheck(alternative)
+125: 			ok, err := condeval.Match(images.post, check)
+126: 			if err != nil {
+127: 				return w.deny(operation, alternative.Rule, checkText, fmt.Sprintf("post-image check could not be evaluated for rule %q: %v", alternative.Rule, err))
+128: 			}
+129: 			if ok {
+130: 				return checkFields(operation, images, w, alternative)
+131: 			}
+132: 		}
+133: 		return terminalAdmits(operation, images, w, "no rule admits the new row")
+134: 	}
+135: 	if !images.exists {
+136: 		// Nothing to protect: the adapter reports the missing row unless an
+137: 		// unconditional allow applies.
+138: 		if r.Terminal != nil {
+139: 			return nil
+140: 		}
+141: 		return w.deny(operation, "", "", "row does not exist or is outside every conditional rule")
+142: 	}
+143: 	for _, alternative := range r.Alternatives {
+144: 		ok, err := condeval.Match(images.pre, alternative.Where)
+145: 		if err != nil {
+146: 			return w.deny(operation, alternative.Rule, alternative.WhereText, fmt.Sprintf("row condition could not be evaluated for rule %q: %v", alternative.Rule, err))
+147: 		}
+148: 		if !ok {
+149: 			continue
+150: 		}
+151: 		if operation == Delete {
+152: 			return nil
+153: 		}
+154: 		if err := checkFields(operation, images, w, alternative); err != nil {
+155: 			return err
+156: 		}
+157: 		check, checkText := alternativeCheck(alternative)
+158: 		ok, err = condeval.Match(images.post, check)
+159: 		if err != nil {
+160: 			return w.deny(operation, alternative.Rule, checkText, fmt.Sprintf("post-image check could not be evaluated for rule %q: %v", alternative.Rule, err))
+161: 		}
+162: 		if !ok {
+163: 			return w.deny(operation, alternative.Rule, checkText, fmt.Sprintf("post-image check not satisfied for rule %q (check: %s)", alternative.Rule, checkText))
+164: 		}
+165: 		return nil
+166: 	}
+167: 	return terminalAdmits(operation, images, w, "row condition not satisfied for any rule")
+168: }
+169: 
+170: // alternativeCheck returns the post-image condition of an alternative: its
+171: // Check, or its Where when no Check is declared.
+172: func alternativeCheck(alternative WriteAlternative) (dal.Condition, string) {
+173: 	if alternative.Check != nil {
+174: 		return alternative.Check, alternative.CheckText
+175: 	}
+176: 	return alternative.Where, alternative.WhereText
+177: }
+178: 
+179: // terminalAdmits applies the Terminal allow, if any, to a write no
+180: // alternative decided: a Delete needs no check; other writes must satisfy the
+181: // terminal's Check when it has one.
+182: func terminalAdmits(operation Operations, images writeImages, w writeResidual, failure string) error {
+183: 	terminal := w.residual.Terminal
+184: 	if terminal == nil {
+185: 		return w.deny(operation, alternativeNames(w.residual), alternativeTexts(w.residual), failure)
+186: 	}
+187: 	if operation == Delete {
+188: 		return nil
+189: 	}
+190: 	if err := checkFields(operation, images, w, *terminal); err != nil {
+191: 		return err
+192: 	}
+193: 	if terminal.Check == nil {
+194: 		return nil
+195: 	}
+196: 	ok, err := condeval.Match(images.post, terminal.Check)
+197: 	if err != nil {
+198: 		return w.deny(operation, terminal.Rule, terminal.CheckText, fmt.Sprintf("post-image check could not be evaluated for rule %q: %v", terminal.Rule, err))
+199: 	}
+200: 	if !ok {
+201: 		return w.deny(operation, terminal.Rule, terminal.CheckText, fmt.Sprintf("post-image check not satisfied for rule %q (check: %s)", terminal.Rule, terminal.CheckText))
+202: 	}
+203: 	return nil
+204: }
+205: 
+206: // checkFields refuses a write that sets (Insert, Set) or touches (Update) a
+207: // field outside the deciding alternative's allow-list.
+208: func checkFields(operation Operations, images writeImages, w writeResidual, alternative WriteAlternative) error {
+209: 	if alternative.fields == nil {
+210: 		return nil
+211: 	}
+212: 	sets := fieldSets{alternative.fields}
+213: 	var refused []string
+214: 	if operation == Update {
+215: 		refused = sets.disallowedUpdates(images.updates)
+216: 	} else {
+217: 		refused = sets.disallowedPaths(images.post)
+218: 	}
+219: 	if len(refused) == 0 {
+220: 		return nil
+```
+
+## dal-go/dalgo/access/condition.go:185
+
+```
+185: 	}
+186: 	for i := 1; i < len(residuals); i++ {
+187: 		for _, r := range residuals[i] {
+188: 			return nil, r.deny(Query, fmt.Sprintf("conditional rule %q applies to a joined source; conditional rules on joins are not supported in this version", r.rule))
+189: 		}
+190: 	}
+191: 	base := residuals[0]
+192: 	if len(base) == 0 {
+193: 		return query, nil
+194: 	}
+195: 	structured, ok := query.(dal.StructuredQuery)
+196: 	if !ok {
+197: 		return nil, base[0].deny(Query, "row conditions require a structured query")
+198: 	}
+199: 	conditions := make([]dal.Condition, len(base))
+200: 	for i, r := range base {
+201: 		conditions[i] = r.condition
+202: 	}
+203: 	condition := conditions[0]
+204: 	if len(conditions) > 1 {
+205: 		condition = dal.NewGroupCondition(dal.And, conditions...)
+206: 	}
+207: 	if existing := structured.Where(); existing != nil {
+208: 		condition = dal.NewGroupCondition(dal.And, existing, condition)
+209: 	}
+210: 	return dal.WithWhere(structured, condition), nil
+211: }
+212: 
+213: // existsThroughRead upgrades an existence check to a read so a residual can be
+214: // evaluated. The record is read into a private map, never into caller memory.
+215: func existsThroughRead(ctx context.Context, session dal.ReadSession, key *record.Key, residuals []residual) (bool, error) {
+216: 	shadow := record.NewRecordWithData(key, &map[string]any{})
+217: 	if err := session.Get(ctx, shadow); err != nil {
+218: 		return false, err
+219: 	}
+220: 	if !shadow.Exists() {
+221: 		return false, nil
+222: 	}
+223: 	if err := checkRecord(Exists, shadow, residuals); err != nil {
+224: 		return false, err
+225: 	}
+226: 	return true, nil
+227: }
+```
+
+## datatug/datatug-cli/pkg/accesspolicies/run.go:35
+
+```
+35: 	// Lines explains, per policy, what applied to the query; nil when
+36: 	// unrestricted.
+37: 	Lines []Line
+38: 	// Query is the query as executed, with parameters substituted.
+39: 	Query dal.Query
+40: }
+41: 
+42: // Run executes query over session as a policy-secured application would for
+43: // the principal: it puts the principal and variables on the context,
+44: // substitutes the query's own parameters, refuses aliases and references to
+45: // fields the caller may not see, explains the policies' decisions and opens
+46: // the reader through access.SecureReadSession. Denials wrap
+47: // access.ErrAccessDenied; refused queries wrap ErrInvalidQuery.
+48: func Run(ctx context.Context, session dal.ReadSession, query dal.Query, o Options) (Result, error) {
+49: 	if len(o.Policies) == 0 && !o.Unrestricted {
+50: 		return Result{}, ErrNoPolicies
+51: 	}
+52: 	bindings := map[string]any{}
+53: 	for name, value := range o.Variables {
+54: 		bindings[name] = value
+55: 	}
+56: 	if o.Principal != nil {
+57: 		if o.Principal.ID != nil {
+58: 			bindings["currentUser"] = o.Principal.ID
+59: 		}
+60: 		ctx = access.WithPrincipal(ctx, *o.Principal)
+61: 	}
+62: 	if len(o.Variables) > 0 {
+63: 		ctx = access.WithVariables(ctx, o.Variables)
+64: 	}
+65: 	query, err := substituteParams(query, o.Variables)
+66: 	if err != nil {
+67: 		return Result{}, err
+68: 	}
+69: 	result := Result{Query: query}
+70: 	if len(o.Policies) == 0 {
+71: 		result.Reader, err = session.ExecuteQueryToRecordsReader(ctx, query)
+72: 		return result, err
+73: 	}
+74: 	result.Lines = Explain(ctx, o.Policies, query, bindings)
+75: 	if structured, ok := query.(dal.StructuredQuery); ok && restricted(result.Lines) {
+76: 		if aliases := aliasedColumns(structured); len(aliases) > 0 {
+77: 			return result, fmt.Errorf("%w: column aliases are not supported under field-restricted policies: %s", ErrInvalidQuery, strings.Join(aliases, ", "))
+78: 		}
+79: 		hidden, err := hiddenReferences(structured, result.Lines)
+80: 		if err != nil {
+81: 			return result, fmt.Errorf("%w: cannot verify the query against field-restricted policies: %v", access.ErrAccessDenied, err)
+82: 		}
+83: 		if len(hidden) > 0 {
+84: 			return result, fmt.Errorf("%w: the query selects, filters or sorts on fields the policies hide: %s", access.ErrAccessDenied, strings.Join(hidden, ", "))
+85: 		}
+86: 	}
+87: 	secured := access.SecureReadSession(session, Policies(o.Policies)...)
+88: 	result.Reader, err = secured.ExecuteQueryToRecordsReader(ctx, query)
+89: 	return result, err
+90: }
+91: 
+92: // substituteParams resolves the query document's own `param` nodes from the
+93: // caller's variables. Only the right-hand side of a `where` comparison may
+94: // hold a parameter; one anywhere else, or one no variable resolves, is an
+95: // ErrInvalidQuery.
+96: func substituteParams(query dal.Query, variables map[string]any) (dal.Query, error) {
+```
+
+## datatug/datatug-cli/pkg/accesspolicies/explain.go:88
+
+```
+88: // Explain asks every loaded policy what it decides for the query's base
+89: // collection and returns one Line per policy, in load order. bindings are the
+90: // variables the caller supplied; only those are echoed.
+91: func Explain(ctx context.Context, loaded []Loaded, query dal.Query, bindings map[string]any) []Line {
+92: 	resource := BaseResource(query)
+93: 	request := access.Request{Operation: access.Query, Resources: []access.Resource{resource}, Query: query}
+94: 	lines := make([]Line, 0, len(loaded))
+95: 	for _, item := range loaded {
+96: 		lines = append(lines, lineFor(item, item.Policy.Decide(ctx, request), resource, bindings))
+97: 	}
+98: 	return lines
+99: }
+100: 
+101: func lineFor(item Loaded, decision access.Decision, resource access.Resource, bindings map[string]any) Line {
+102: 	line := Line{Policy: item.Policy.Name(), Source: item.Source, Resource: resource.String(), Rule: decision.Rule, Allowed: decision.Allowed, Explanation: decision.Explanation}
+103: 	if _, via, ok := strings.Cut(decision.Explanation, " via "); ok {
+104: 		line.Via = via
+105: 	}
+106: 	if !decision.Allowed {
+107: 		return line
+108: 	}
+109: 	if len(decision.Residuals) > 0 && decision.Residuals[0] != nil && decision.Condition != "" {
+110: 		line.Condition = decision.Condition
+111: 		line.Bindings = bindingsFor(decision.Condition, bindings)
+112: 	}
+113: 	if len(decision.Writes) > 0 && decision.Writes[0] != nil {
+114: 		line.FieldLists = fieldLists(decision.Writes[0])
+115: 	}
+116: 	return line
+117: }
+118: 
+119: // bindingsFor lists the caller-supplied values of the variables a condition
+120: // references, sorted by name.
+121: func bindingsFor(condition string, bindings map[string]any) []string {
+122: 	seen := map[string]bool{}
+123: 	var parts []string
+124: 	for _, match := range variableReference.FindAllStringSubmatch(condition, -1) {
+125: 		name := match[1]
+126: 		value, ok := bindings[name]
+127: 		if !ok || seen[name] {
+128: 			continue
+129: 		}
+```
+
+## openvaultdb/openvaultdb-go/pkg/auth/middleware.go:10
+
+```
+10: // Config is the server-side auth configuration. A nil *Config means auth is
+11: // disabled (the local-dev default documented in the threat model).
+12: type Config struct {
+13: 	// OwnerToken grants full access to everything, including admin endpoints.
+14: 	OwnerToken string
+15: 	// Store holds application grants and pending authorization codes.
+16: 	Store *Store
+17: }
+18: 
+19: type contextKey struct{}
+20: 
+21: // FromRequest returns the authenticated principal attached by Middleware,
+22: // or nil when the request is unauthenticated (public path or auth disabled).
+23: func FromRequest(r *http.Request) *Principal {
+24: 	p, _ := r.Context().Value(contextKey{}).(*Principal)
+25: 	return p
+26: }
+27: 
+28: // publicPath reports whether the path is reachable without a token: the
+29: // discovery document and the connect flow itself.
+30: func publicPath(path string) bool {
+31: 	switch path {
+32: 	case "/.well-known/openvaultdb", "/authorize", "/token":
+33: 		return true
+34: 	}
+35: 	return false
+36: }
+37: 
+38: // Middleware implements the spec's Layer-1 token validation: it
+39: // authenticates every request (401 on missing/invalid tokens except on
+40: // public paths) and attaches the Principal for the handlers' Layer-2
+41: // capability enforcement.
+42: func (cfg *Config) Middleware(next http.Handler) http.Handler {
+43: 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+44: 		if publicPath(r.URL.Path) {
+45: 			next.ServeHTTP(w, r)
+46: 			return
+47: 		}
+48: 		token := BearerToken(r)
+49: 		if token == "" {
+50: 			unauthorized(w, "missing bearer token")
+51: 			return
+52: 		}
+53: 		if subtle.ConstantTimeCompare([]byte(token), []byte(cfg.OwnerToken)) == 1 {
+54: 			next.ServeHTTP(w, r.WithContext(
+55: 				context.WithValue(r.Context(), contextKey{}, &Principal{Owner: true})))
+56: 			return
+57: 		}
+58: 		if g := cfg.Store.Lookup(token); g != nil {
+59: 			next.ServeHTTP(w, r.WithContext(
+60: 				context.WithValue(r.Context(), contextKey{}, &Principal{Grant: g})))
+61: 			return
+62: 		}
+63: 		unauthorized(w, "invalid or expired token")
+64: 	})
+65: }
+66: 
+67: // BearerToken extracts the bearer token from the Authorization header.
+68: func BearerToken(r *http.Request) string {
+```
+
+## openvaultdb/openvaultdb-go/pkg/server/httperr.go:1
+
+```
+1: package server
+2: 
+3: import (
+4: 	"errors"
+5: 	"net/http"
+6: 
+7: 	"github.com/openvaultdb/openvaultdb-go/pkg/core"
+8: 
+9: 	"github.com/openvaultdb/openvaultdb-go/pkg/schema"
+10: )
+11: 
+12: type errorBody struct {
+13: 	Error errorDetail `json:"error"`
+14: }
+15: 
+16: type errorDetail struct {
+17: 	Code    string `json:"code"`
+18: 	Message string `json:"message"`
+19: }
+20: 
+21: func writeError(w http.ResponseWriter, status int, code, message string) {
+22: 	writeJSON(w, status, errorBody{Error: errorDetail{Code: code, Message: message}})
+23: }
+24: 
+25: // writeMappedError converts core/engine/schema errors into the API error
+26: // shapes documented in docs/api.md.
+27: func writeMappedError(w http.ResponseWriter, err error) {
+28: 	var validationErr *schema.ValidationError
+29: 	switch {
+30: 	case errors.Is(err, core.ErrNotFound), errors.Is(err, core.ErrUpdateOfMissingRecord):
+31: 		writeError(w, http.StatusNotFound, "not_found", err.Error())
+32: 	case errors.Is(err, core.ErrAlreadyExists):
+33: 		writeError(w, http.StatusConflict, "already_exists", err.Error())
+34: 	case errors.As(err, &validationErr):
+35: 		writeError(w, http.StatusUnprocessableEntity, "schema_validation", err.Error())
+36: 	default:
+37: 		writeError(w, http.StatusInternalServerError, "internal", err.Error())
+38: 	}
+39: }
+```
+
+## ingitdb/dalgo2ingitdb/database.go:129
+
+```
+129: // worker with a read-write transaction. Writes are journaled in-memory before
+130: // their first filesystem mutation. If the worker or the optional Git commit
+131: // fails, the touched files are restored to their exact pre-transaction state.
+132: // This is deliberately a single-writer transaction: it makes a failed
+133: // multi-record Synchestra state transition recoverable without pretending that
+134: // a Git worktree supports concurrent multi-writer transactions.
+135: func (db *Database) RunReadwriteTransaction(ctx context.Context, f dal.RWTxWorker, options ...dal.TransactionOption) error {
+136: 	// This lock covers definition load, all record mutations, rollback, and the
+137: 	// optional Git ref update. It serialises cooperating Database writers for
+138: 	// the complete transaction; Git/editor processes that ignore advisory locks
+139: 	// remain outside this adapter's explicit single-writer contract.
+140: 	lockPath, err := transactionLockPath(ctx, db.projectPath)
+141: 	if err != nil {
+142: 		return err
+143: 	}
+144: 	return withExclusiveLock(lockPath, func() error {
+145: 		return db.runReadwriteTransaction(ctx, f, options...)
+146: 	})
+147: }
+148: 
+149: func (db *Database) withTransactionReadLock(ctx context.Context, fn func() error) error {
+150: 	lockPath, err := transactionLockPath(ctx, db.projectPath)
+151: 	if err != nil {
+152: 		return err
+153: 	}
+154: 	return withSharedLock(lockPath, fn)
+155: }
+156: 
+```
+
+## openvaultdb/openvaultdb/spec/decisions/0004-sneat-co-identity-and-space-principals.md:27
+
+```
+27: an application or extension as if it were the user or Space would erase the
+28: explicit client and capability boundaries required by OpenVaultDB.
+29: 
+30: ## Decision
+31: 
+32: The hosted OpenVaultDB Cloud service MUST authenticate humans through the shared
+33: Sneat Co. Firebase project `sneat-eur3-1`. The verified Firebase UID is the
+34: canonical Sneat Co. `userID` and MUST be used directly as the hosted
+35: OpenVaultDB user principal; the service MUST NOT create a second translated
+36: OpenVaultDB account ID.
+37: 
+38: A Sneat Co. Space is a first-class collaborative grant subject identified by
+39: its `spaceID`. Its identity and grants MUST NOT depend on whether it is
+40: presented by `sneat.work`, `sneat.app`, or an extension mini-app.
+41: 
+42: Products, extension mini-apps, services, and CLIs are registered clients. A
+43: client acts as itself and, where approved, on behalf of an authenticated user
+44: or Space. Merely running inside a product or Space MUST NOT confer OpenVaultDB
+45: access; the client and requested capabilities remain explicit in every grant.
+46: 
+47: A contact without a linked Sneat Co. `userID` MAY be the target of a pending
+48: invitation, but MUST NOT become an active authenticated grant subject until the
+49: contact is securely claimed and linked to a user.
+50: 
+51: Long-lived device tokens MUST identify the authenticated `userID`, registered
+52: client, and approved token scopes. They MUST NOT snapshot Space membership or
+53: roles. Resource authorization MUST evaluate the current Space membership and
+54: OpenVaultDB grant when the resource is used, failing closed when membership
+55: cannot be established.
+56: 
+57: This hosted identity profile does not constrain self-hosted or third-party
+58: OpenVaultDB providers, which MAY use their own identity and group resolvers.
+59: 
+60: ## Rationale
+61: 
+62: The shared user ID makes OpenVaultDB collaboration compose directly with the
+63: existing Sneat Co. contact and Space membership model. A user removed from a
+64: Space can lose access without rewriting a copied list of per-user grants, and a
+65: contact can retain its team-local identity while an invitation is pending.
+```
+
+
+===== END FROZEN PACKET =====

@@ -1,0 +1,29 @@
+{
+  "packetRevision": "A1",
+  "packetSHA256": "efd8dd40013888eee43ab8582e35b506d9fbce9e61a8e08d21a4c6b004821b94",
+  "reviewers": {
+    "astraB": {
+      "requestedModel": "gpt-6-astra",
+      "reasoningEffort": "high",
+      "task": "/root/astra_b_review",
+      "usageAvailability": "Measured after completion from Codex cumulative token_count events; astra-run-metadata.json"
+    },
+    "opus": {
+      "requestedModel": "opus",
+      "reasoningEffort": "high",
+      "tool": "Claude Code --print, tools disabled, safe-mode",
+      "telemetryFile": "opus-run-metadata.json",
+      "executedReviewModel": "claude-opus-5",
+      "ancillaryModel": "claude-haiku-4-5-20251001, tooling-reported auxiliary call"
+    }
+  },
+  "independence": "Same frozen input text. Neither reviewer is given the other review. Tools disabled for Opus; Astra instructed to read only shared packet. Author retains sole write ownership.",
+  "reconciliation": "Separate agent after both reviews; no implementation dispatch.",
+  "reconciler": {
+    "task": "/root/review_reconciler",
+    "requestedModel": "inherited gpt-6-astra",
+    "status": "completed",
+    "telemetryFile": "reconciler-run-metadata.json"
+  },
+  "status": "Human checkpoint; no implementation dispatch"
+}
