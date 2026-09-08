@@ -1,0 +1,145 @@
+{
+  "scope": "A3 scoped-stage delta only",
+  "astra": {
+    "model": "gpt-6-astra",
+    "usage": {
+      "input_tokens": 454980,
+      "cached_input_tokens": 412032,
+      "cache_write_input_tokens": 0,
+      "output_tokens": 3702,
+      "reasoning_output_tokens": 1849,
+      "total_tokens": 458682
+    },
+    "elapsedSeconds": 183.932,
+    "reportedCostUSD": null,
+    "acceptedRoots": 2,
+    "uniqueAcceptedRoots": 1,
+    "acceptedHighCritical": 0
+  },
+  "opus": {
+    "model": "claude-opus-5",
+    "coreInputTokens": 64310,
+    "coreOutputTokens": 13702,
+    "coreTotalTokens": 78012,
+    "helperModel": "claude-haiku-4-5-20251001",
+    "helperUsage": {
+      "inputTokens": 44379,
+      "outputTokens": 16,
+      "cacheReadInputTokens": 0,
+      "cacheCreationInputTokens": 0,
+      "webSearchRequests": 0,
+      "costUSD": 0.044459,
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000,
+      "thinkingTokens": 0,
+      "canonicalModel": "claude-haiku-4-5",
+      "provider": "firstParty",
+      "costBasis": "list"
+    },
+    "modelUsage": {
+      "claude-haiku-4-5-20251001": {
+        "inputTokens": 44379,
+        "outputTokens": 16,
+        "cacheReadInputTokens": 0,
+        "cacheCreationInputTokens": 0,
+        "webSearchRequests": 0,
+        "costUSD": 0.044459,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000,
+        "thinkingTokens": 0,
+        "canonicalModel": "claude-haiku-4-5",
+        "provider": "firstParty",
+        "costBasis": "list"
+      },
+      "claude-opus-5": {
+        "inputTokens": 2,
+        "outputTokens": 13702,
+        "cacheReadInputTokens": 0,
+        "cacheCreationInputTokens": 64308,
+        "webSearchRequests": 0,
+        "costUSD": 0.9856400000000001,
+        "contextWindow": 1000000,
+        "maxOutputTokens": 64000,
+        "thinkingTokens": 9356,
+        "canonicalModel": "claude-opus-5",
+        "provider": "firstParty",
+        "costBasis": "list"
+      }
+    },
+    "reportedCostUSD": 1.030099,
+    "elapsedSeconds": 190.451,
+    "acceptedRoots": 2,
+    "uniqueAcceptedRoots": 1,
+    "acceptedHighCritical": 0,
+    "costPerAcceptedRootUSD": 0.5150495,
+    "costPerUniqueAcceptedRootUSD": 1.030099
+  },
+  "acceptedOverlap": {
+    "astra": 2,
+    "opus": 2,
+    "shared": 1,
+    "union": 3,
+    "jaccard": 0.3333333333333333,
+    "smallerReviewOverlap": 0.5
+  },
+  "allSubmittedRows": {
+    "astra": 2,
+    "opus": 8,
+    "caution": "Rows contain mixed defect claims and regression recommendations; accepted-root overlap is the cleaner metric."
+  },
+  "costCaveat": "Tooling-reported list/API cost including helper, not an invoice. Codex USD unavailable; cached input includes rereads.",
+  "reconciler-run-metadata.json": {
+    "role": "reconciler",
+    "model": "gpt-6-astra",
+    "sessionFile": "rollout-2026-09-08T15-43-03-01a081af-e612-7f62-89cd-bcae51aaba7d.jsonl",
+    "startedAt": "2026-09-08T15:43:03.771Z",
+    "finishedAt": "2026-09-08T15:44:54.812Z",
+    "elapsedSeconds": 111.055,
+    "usage": {
+      "input_tokens": 175029,
+      "cached_input_tokens": 140032,
+      "cache_write_input_tokens": 0,
+      "output_tokens": 2890,
+      "reasoning_output_tokens": 156,
+      "total_tokens": 177919
+    },
+    "cumulativeUsage": {
+      "input_tokens": 175029,
+      "cached_input_tokens": 140032,
+      "cache_write_input_tokens": 0,
+      "output_tokens": 2890,
+      "reasoning_output_tokens": 156,
+      "total_tokens": 177919
+    },
+    "reportedCostUSD": null,
+    "costAvailability": "Codex harness exposes tokens but not monetary cost; unknown is not zero",
+    "counting": "Cumulative input includes cached repeated context; output includes reasoning. Follow-up counts are cumulative differences."
+  },
+  "reconciler-verification-run-metadata.json": {
+    "role": "reconciler",
+    "model": "gpt-6-astra",
+    "sessionFile": "rollout-2026-09-08T15-43-03-01a081af-e612-7f62-89cd-bcae51aaba7d.jsonl",
+    "startedAt": "2026-09-08T15:47:09.267Z",
+    "finishedAt": "2026-09-08T15:48:25.199Z",
+    "elapsedSeconds": 75.933,
+    "usage": {
+      "input_tokens": 387027,
+      "cached_input_tokens": 372352,
+      "cache_write_input_tokens": 0,
+      "output_tokens": 1633,
+      "reasoning_output_tokens": 34,
+      "total_tokens": 388660
+    },
+    "cumulativeUsage": {
+      "input_tokens": 562056,
+      "cached_input_tokens": 512384,
+      "cache_write_input_tokens": 0,
+      "output_tokens": 4523,
+      "reasoning_output_tokens": 190,
+      "total_tokens": 566579
+    },
+    "reportedCostUSD": null,
+    "costAvailability": "Codex harness exposes tokens but not monetary cost; unknown is not zero",
+    "counting": "Cumulative input includes cached repeated context; output includes reasoning. Follow-up counts are cumulative differences."
+  }
+}

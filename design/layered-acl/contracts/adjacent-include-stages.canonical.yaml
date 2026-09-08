@@ -1,0 +1,6 @@
+stages:
+- include:
+  - a*
+  - b*
+- exclude:
+  - "*c*"

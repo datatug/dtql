@@ -1,19 +1,26 @@
 apiVersion: dtql.org/access/v1
 collectionMask:
-  exclude:
-  - sys_*
-  include:
-  - '*'
+  stages:
+  - include:
+    - a*
+    - b*
+  - exclude:
+    - "*c*"
+  - include:
+    - "*d"
+    - a*f
 composition: dalgo-hierarchical-v1
 default: deny
 execution:
   allow:
   - class: dtql
   - class: stored_procedure
-    exclude:
-    - User_Delete
-    include:
-    - User_*
+    mask:
+      stages:
+      - include:
+        - User_*
+      - exclude:
+        - User_Delete
     namespace: public
 kind: AccessPolicy
 metadata:
@@ -24,11 +31,12 @@ scopes:
   rules:
   - effect: allow
     fieldMask:
-      exclude:
-      - address.internal_*
-      - secret_*
-      include:
-      - '*'
+      stages:
+      - include:
+        - "*"
+      - exclude:
+        - address.internal_*
+        - secret_*
     id: surface
     operations:
     - get

@@ -1,0 +1,9 @@
+{
+  "verifiedManifestEntries": 48,
+  "frozenInputsPreserved": true,
+  "localLinksValid": true,
+  "structuralFixtureCount": 30,
+  "canonicalArtifactCount": 4,
+  "canonicalHarnessScope": "document authoring; not production DALgo serializer",
+  "implementationStarted": false
+}

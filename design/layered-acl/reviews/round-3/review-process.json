@@ -1,0 +1,12 @@
+{
+  "packetSHA256": "f2c80013ea78f91bc878ea5338081ce42f48bad2b8f4690430d0bc9cb8617980",
+  "independence": "Identical frozen input; neither reviewer sees peer report; author sole writer",
+  "astraTask": "/root/astra_scoped_masks",
+  "astraRequestedModel": "gpt-6-astra",
+  "opusRequestedModel": "opus",
+  "reconciliation": "Separate new agent after both reports sealed",
+  "implementationDispatched": false,
+  "status": "Independent reviews sealed; separate reconciliation and correction verification complete; pending human sign-off",
+  "reconcilerTask": "/root/scoped_masks_reconciler",
+  "verifiedFinalSHA256": "7172e9e3703d589833c53b366ffd43f09c50436c94d41aa4906656b43b0989d3"
+}

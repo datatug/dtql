@@ -1161,6 +1161,18 @@
         "responseBytes": {
           "type": "integer",
           "minimum": 1
+        },
+        "maxMaskStages": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxMaskPatterns": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxMaskPatternBytes": {
+          "type": "integer",
+          "minimum": 1
         }
       },
       "required": [
@@ -1172,7 +1184,10 @@
         "sampleRows",
         "operations",
         "columns",
-        "responseBytes"
+        "responseBytes",
+        "maxMaskStages",
+        "maxMaskPatterns",
+        "maxMaskPatternBytes"
       ],
       "additionalProperties": false
     },
@@ -2435,29 +2450,14 @@
                     "maxLength": 128,
                     "pattern": "^[^./\\\\\\x00-\\x1f*]+$"
                   },
-                  "include": {
-                    "type": "array",
-                    "items": {
-                      "$ref": "#/$defs/nameMask"
-                    },
-                    "minItems": 1,
-                    "maxItems": 32,
-                    "uniqueItems": true
-                  },
-                  "exclude": {
-                    "type": "array",
-                    "items": {
-                      "$ref": "#/$defs/nameMask"
-                    },
-                    "minItems": 0,
-                    "maxItems": 32,
-                    "uniqueItems": true
+                  "mask": {
+                    "$ref": "#/$defs/collectionMask"
                   }
                 },
                 "required": [
                   "class",
                   "namespace",
-                  "include"
+                  "mask"
                 ],
                 "additionalProperties": false
               }
@@ -2477,7 +2477,7 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 128,
-      "pattern": "^(?:[^*./\\\\\\x00-\\x20\\x7f?\\[\\]]+|\\*|[^*./\\\\\\x00-\\x20\\x7f?\\[\\]]+\\*|\\*[^*./\\\\\\x00-\\x20\\x7f?\\[\\]]+)$"
+      "pattern": "^[^./\\\\\\x00-\\x20\\x7f?\\[\\]]+$"
     },
     "fieldPattern": {
       "type": "string",
@@ -2487,54 +2487,68 @@
     "collectionMask": {
       "type": "object",
       "properties": {
-        "include": {
+        "stages": {
           "type": "array",
-          "items": {
-            "$ref": "#/$defs/nameMask"
-          },
           "minItems": 1,
-          "maxItems": 32,
-          "uniqueItems": true
-        },
-        "exclude": {
-          "type": "array",
+          "prefixItems": [
+            {
+              "type": "object",
+              "properties": {
+                "include": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/nameMask"
+                  },
+                  "minItems": 1
+                }
+              },
+              "required": [
+                "include"
+              ],
+              "additionalProperties": false
+            }
+          ],
           "items": {
-            "$ref": "#/$defs/nameMask"
-          },
-          "minItems": 0,
-          "maxItems": 32,
-          "uniqueItems": true
+            "$ref": "#/$defs/nameStage"
+          }
         }
       },
       "required": [
-        "include"
+        "stages"
       ],
       "additionalProperties": false
     },
     "fieldMask": {
       "type": "object",
       "properties": {
-        "include": {
+        "stages": {
           "type": "array",
-          "items": {
-            "$ref": "#/$defs/fieldPattern"
-          },
           "minItems": 1,
-          "maxItems": 32,
-          "uniqueItems": true
-        },
-        "exclude": {
-          "type": "array",
+          "prefixItems": [
+            {
+              "type": "object",
+              "properties": {
+                "include": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/fieldPattern"
+                  },
+                  "minItems": 1
+                }
+              },
+              "required": [
+                "include"
+              ],
+              "additionalProperties": false
+            }
+          ],
           "items": {
-            "$ref": "#/$defs/fieldPattern"
-          },
-          "minItems": 0,
-          "maxItems": 32,
-          "uniqueItems": true
+            "$ref": "#/$defs/fieldStage"
+          }
         }
       },
       "required": [
-        "include"
+        "stages"
       ],
       "additionalProperties": false
     },
@@ -2617,6 +2631,78 @@
         "authorization"
       ],
       "additionalProperties": false
+    },
+    "nameStage": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "include": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/nameMask"
+              },
+              "minItems": 1
+            }
+          },
+          "required": [
+            "include"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "exclude": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/nameMask"
+              },
+              "minItems": 1
+            }
+          },
+          "required": [
+            "exclude"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "fieldStage": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "include": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/fieldPattern"
+              },
+              "minItems": 1
+            }
+          },
+          "required": [
+            "include"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "exclude": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/fieldPattern"
+              },
+              "minItems": 1
+            }
+          },
+          "required": [
+            "exclude"
+          ],
+          "additionalProperties": false
+        }
+      ]
     }
   }
 }

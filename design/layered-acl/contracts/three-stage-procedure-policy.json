@@ -48,7 +48,12 @@
             },
             {
               "exclude": [
-                "User_Delete"
+                "User_Delete*"
+              ]
+            },
+            {
+              "include": [
+                "User_DeleteDraft"
               ]
             }
           ]

@@ -11,11 +11,17 @@
   "composition": "dalgo-hierarchical-v1",
   "default": "deny",
   "collectionMask": {
-    "include": [
-      "*"
-    ],
-    "exclude": [
-      "sys_*"
+    "stages": [
+      {
+        "include": [
+          "*"
+        ]
+      },
+      {
+        "exclude": [
+          "sys_*"
+        ]
+      }
     ]
   },
   "execution": {
@@ -26,12 +32,20 @@
       {
         "class": "stored_procedure",
         "namespace": "public",
-        "include": [
-          "U*er_*"
-        ],
-        "exclude": [
-          "User_Delete"
-        ]
+        "mask": {
+          "stages": [
+            {
+              "include": [
+                "U*er_*"
+              ]
+            },
+            {
+              "exclude": [
+                "User_Delete"
+              ]
+            }
+          ]
+        }
       }
     ]
   },
@@ -52,12 +66,18 @@
             "delete"
           ],
           "fieldMask": {
-            "include": [
-              "*"
-            ],
-            "exclude": [
-              "address.internal_*",
-              "secret_*"
+            "stages": [
+              {
+                "include": [
+                  "*"
+                ]
+              },
+              {
+                "exclude": [
+                  "address.internal_*",
+                  "secret_*"
+                ]
+              }
             ]
           }
         }

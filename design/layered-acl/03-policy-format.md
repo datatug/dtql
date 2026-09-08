@@ -98,11 +98,9 @@ MVP promises semantic round-trip and canonical idempotence: parse → document A
 
 Unknown-version, custom or nonportable policy documents remain represented by read-only descriptors. Never edit through a reduced AST and drop unsupported fields. A supported document with complex scope/pattern structure outside the form editor's fidelity can likewise be read-only or edited through the optional raw editor. Legacy conversion is an explicit owner-admin action with before/after differential fixtures; do not strip `target`/`composition` and call that a complete migration.
 
-## Execution routes and inclusion/exclusion masks — user addition
+## Execution routes and scoped masks
 
-C7 adds optional `execution` to the same AccessPolicy document; it is a conjunctive gate evaluated by DALgo before route dispatch, not a competing policy engine. It is independent of table/row/field admission. Omission adds no route restriction (legacy meaning preserved); a present object defaults to deny for every unlisted class. `execution.allow` is an array, possibly empty to forbid every class. Each entry has `class:dtql|native_sql|native_graphql|stored_procedure`. dtql/native_sql/native_graphql entries contain only class. stored_procedure entries additionally require an exact owner-resolved `namespace`, nonempty `include` mask array and optional `exclude` mask array. Multiple entries union **inside this one gate**; exclusions for the same class/namespace across entries are accumulated and win over every inclusion. Independent policies/layers still intersect, so another owner's deny cannot be reopened.
-
-Example route restriction (inside an otherwise applicable policy):
+C7 optional execution is a conjunctive gate in the same AccessPolicy/evaluator. Omission adds no route restriction; a present allow array defaults to deny for unlisted classes. Entries are class:dtql|native_sql|native_graphql|stored_procedure; procedure entries also require exact canonical namespace and a staged mask as defined in [19](19-scoped-mask-stages.md). Reject duplicate class/namespace entries. Ordinary action/resource policy checks still apply, and different mandatory policies intersect.
 
 ```yaml
 execution:
@@ -110,13 +108,13 @@ execution:
     - class: dtql
     - class: stored_procedure
       namespace: public
-      include: ["User_*"]
+      mask:
+        stages:
+          - include: ["User_*"]
+          - exclude: ["User_Delete*"]
+          - include: ["User_DeleteDraft"]
 ```
 
-This forbids native SQL/GraphQL and every stored procedure outside public.User_*. To allow all procedures in public except sys_*, use `include: ["*"]` and `exclude: ["sys_*"]`. To forbid all stored procedures while retaining DTQL, use only `{class: dtql}`. This is a default-deny allow-list, not an explicit deny-all rule that magically loses to an exception. Admin authors a mandatory narrowing policy with applicable ordinary action scopes plus this route gate; a present gate constrains all operations covered by that policy and does not bypass its ordinary default deny.
+This admits only the scoped callable subset at this gate. Native SQL/GraphQL are unlisted and denied. For every procedure except sys_*, use include:["*"] then exclude:["sys_*"]. A deeper include can restore part of that exclusion, never a lower-owner denial. collectionMask and allow-rule fieldMask use the same stage form, with fieldPattern applying to nested field paths.
 
-Masks match **canonical callable base names**, not query text, argument values, arbitrary paths or schema-qualified SQL strings. Namespace is matched separately and exactly. MVP grammar: anchored, case-sensitive Unicode literal characters with the bounded nameMask grammar in 18 (literal, exactly *, one leading * or one trailing *); no regex, `?`, character classes, recursive globs or escape syntax. Reject names/masks with path separators, dots, controls or ambiguous literal `*`; masks ≤128 characters, ≤32 masks per entry, ≤32 entries. The adapter resolves source case folding/quoted identifiers to canonical namespace/name **before** matching; policy author sees those canonical names. If lossless canonical resolution is unavailable, fail closed. Overloads share the same name-level policy in v1; signature-specific permissions are future work. This portable namespace profile may reject source-specific names rather than guess.
-
-`executionClass` is required in normalized operation descriptors. Existing DTQL requests normalize to dtql; wire A2 requests specify it explicitly. Native SQL/GraphQL and procedure invocation are separate classifications, not new CRUD operations. Stored procedures may read/write arbitrary resources; class/mask permission is necessary but never sufficient for effects authorization. Server chooses the class from the actual ingress/parsed operation, and rejects a conflicting caller label. SQL `CALL`, SELECT invoking side-effecting functions, GraphQL resolvers and multi-statement SQL must not bypass procedure restrictions through a native-query label. Where effects/call graph cannot be bounded and enforced, reject the entire route.
-
-**MVP proves actual DTQL route gating and serializes/evaluates callable masks with conformance fixtures. It does not enable protected native SQL, GraphQL or stored-procedure execution.** These routes remain unsupported even if a route gate would permit their names. Providers must advertise that limitation; native effects analysis and callable execution are follow-up. A plan can return a static route denial without a call; a matching mask does not produce overall allow when effect enforcement is unsupported. DTQL table/path selectors retain their existing structural grammar; this addition does not silently turn them into arbitrary globs.
+executionClass is required in normalized operations; server derives it from the actual route/parsed operation and rejects a conflicting caller label. Calls hidden in SQL/functions/GraphQL cannot bypass procedure restrictions through a native label. The protected MVP permits real DTQL route gating and pure procedure-mask assessment only. All native/procedure effects execution remains unsupported even after a matching mask; no native parser/effects analyzer is added here. Existing DTQL action/table/row/column checks remain mandatory.

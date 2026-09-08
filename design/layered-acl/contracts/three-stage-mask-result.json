@@ -73,12 +73,17 @@
         "stages": [
           {
             "include": [
-              "*"
+              "address.*"
             ]
           },
           {
             "exclude": [
-              "secret_*"
+              "address.internal_*"
+            ]
+          },
+          {
+            "include": [
+              "address.internal_public"
             ]
           }
         ]

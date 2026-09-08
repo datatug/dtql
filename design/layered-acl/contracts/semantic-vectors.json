@@ -193,7 +193,7 @@
     "expected": false
   },
   {
-    "id": "mask-exclusion-wins",
+    "id": "two-stage-exclusion",
     "include": [
       "User_*",
       "*"
@@ -202,18 +202,25 @@
       "User_Delete"
     ],
     "name": "User_Delete",
-    "expected": false
+    "expected": false,
+    "note": "Two stages only; later scoped includes may restore."
   },
   {
     "id": "mask-pass-unsupported",
     "class": "stored_procedure",
     "namespace": "public",
-    "include": [
-      "User_*"
-    ],
     "name": "User_Create",
     "gate": "allow",
-    "expected": "ACL_ENFORCEMENT_UNSUPPORTED; no invocation"
+    "expected": "ACL_ENFORCEMENT_UNSUPPORTED; no invocation",
+    "mask": {
+      "stages": [
+        {
+          "include": [
+            "User_*"
+          ]
+        }
+      ]
+    }
   },
   {
     "id": "sample-all-allow",
@@ -261,11 +268,17 @@
   {
     "id": "parent-evidence-withheld-present",
     "mask": {
-      "include": [
-        "address.*"
-      ],
-      "exclude": [
-        "address.internal_*"
+      "stages": [
+        {
+          "include": [
+            "address.*"
+          ]
+        },
+        {
+          "exclude": [
+            "address.internal_*"
+          ]
+        }
       ]
     },
     "requiredFields": [
@@ -284,11 +297,17 @@
   {
     "id": "parent-evidence-withheld-absent",
     "mask": {
-      "include": [
-        "address.*"
-      ],
-      "exclude": [
-        "address.internal_*"
+      "stages": [
+        {
+          "include": [
+            "address.*"
+          ]
+        },
+        {
+          "exclude": [
+            "address.internal_*"
+          ]
+        }
       ]
     },
     "requiredFields": [

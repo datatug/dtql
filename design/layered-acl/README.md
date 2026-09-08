@@ -1,6 +1,6 @@
 # Layered ACL MVP — design review packet
 
-Status: A1 reconciled recommendations and H1–H7 approved by the user; A2 implementation plan and completed contracts independently reviewed, reconciled and correction-verified; awaiting final human dispatch sign-off. Design only; no MVP implementation is authorized by this packet. Author: Astra A, 2026-09-08.
+Status: A1 reconciled recommendations and H1–H7 approved by the user; A3 user-confirmed scoped masks and implementation plan reviewed, reconciled and correction-verified; awaiting human implementation sign-off. Design only; no MVP implementation is authorized by this packet. Author: Astra A, 2026-09-08.
 
 DTQL owns the portable policy and authorization wire specifications. DALgo evolves its existing `access`, `dtql`, and `condeval` implementation. InGitDB, OpenVaultDB, and the DataTug daemon enforce their own policy sets. The browser displays and administers authorized policy surfaces; it is never an enforcement boundary.
 
@@ -40,6 +40,6 @@ Before parallel implementation, approve C1 policy semantics/version, C2 decision
 
 The independent reviews must use the same packet digest and rubric without access to each other's findings. A separate reconciler classifies findings and produces the human decision report and cost/value comparison. Design approval and permission to dispatch implementation are separate; this phase stops for human sign-off.
 
-Current checkpoint: [reviewed implementation plan, both reviews and cost/value](reviews/round-2/README.md). No implementation has started.
+Current checkpoint: [reviewed implementation plan, both reviews and cost/value](reviews/round-3/README.md). No implementation has started.
 
-Latest user amendment: [scoped alternating mask stages](19-scoped-mask-stages.md). It changes the flat-mask contract after review; the new revision requires schema/plan updates and delta review before freeze or implementation.
+Latest user amendment: [scoped alternating mask stages](19-scoped-mask-stages.md). It supersedes flat masks; schema/plan updates and independent delta review are complete. See the current checkpoint before implementation.

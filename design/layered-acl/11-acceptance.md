@@ -135,3 +135,11 @@ T20 — Execution classes/masks: a mandatory DTQL-only gate rejects native SQL/G
 - Field evidence: request/response resource.columns rejected, exact requiredFields covered; parent under possible child exclusion rejects both when child exists and when absent.
 
 T21's complete definition and owner matrix are in [18-mask-supplement.md](18-mask-supplement.md); it is a mandatory part of this acceptance plan.
+
+## A3 scoped-mask acceptance (T21 extension)
+
+At each owner/hop use include a*/b*, exclude *c*, include **d/a*f. Verify apple/abcd/acf/bdf admitted, bacon/zcd denied. A fourth exclude a* removes abcd/acf again only within the restored subset. Adjacent include a* then include b* is one OR-list, so banana remains admitted. A lower mandatory policy denying abcd remains decisive despite upper restoration. Persist/reload/canonicalize **d to *d without reordering stages. Enforce actual column read/write results, collection gates and pure callable assessment, never native execution.
+
+For nested field masks, retain projectable-versus-complete evidence checks even after restoration; a restored leaf may be readable while its parent remains unsupported as complete evidence. Test the same parent with hidden child present/absent. Over-budget stage/pattern input rejects before activation; a runtime mask budget failure is indeterminate (or overall deny when another definitive blocker exists), never an allow based on the evaluated prefix. Generate stage lists at advertised limit and limit+1 without embedding enormous fixtures in the spec repository.
+
+A3 review regression additions: adjacent exclude runs must OR before matching (banana/b1 denied; bcd restored), with exact canonical merged outputs. The fourth-stage exclusion leaves apple allowed. address.** and address.* match the parent and descendants identically. Transport a three-stage field_mask without dropping restoration. At direct InGitDB, OVDB and DataTug, include * then exclude *secret* hides my_secret_x on wildcard read and denies explicit reference/UPDATE. Run three-stage stored-procedure mask assessment/transport at applicable owners; no procedure execution. Projection may carry a restored address.city in a structural address container; UPDATE only city may pass, but replacing/removing the parent while touching an excluded sibling denies.

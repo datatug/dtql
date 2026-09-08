@@ -68,7 +68,7 @@ Each operation's `restrictionIds` and `allOf` have the same unique set; both ref
 
 - expression: kind row_filter or post_image_check, expression required, no fields/omissionReason;
 - fields: kind field_allowlist, fields required, no expression/omissionReason;
-- mask: kind field_mask, mask include/exclude sets required; no expression/fields/omissionReason (18);
+- mask: kind field_mask, mask ordered stages required; no expression/fields/omissionReason (18);
 - reference: kind row_filter/post_image_check/field_allowlist/field_mask/opaque, omissionReason required (private/too_large/unsupported/not_authorized), no expression/fields.
 
 All variants require id, operationId, representation, kind, enforced; layerId/policyRef are optional under disclosure. `enforced=false` in every dry run, even after successful evaluation. In a successful execution it is true only when that obligation was applied at the actual query/write boundary. A denied execution has no obligation marked enforced merely because its evaluator ran. Internal enforcement completeness is separate from external disclosure: one opaque coalesced owner restriction may stand for several private restrictions. Never emit private cardinality, policy revisions, stable hidden IDs or separate per-policy placeholders to non-admins. Non-admin reference omissions use not_authorized, never private; private is only available to an owner policy admin already authorized to know that classification. All public identifiers/references are checked for referential integrity after redaction.

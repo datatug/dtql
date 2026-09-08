@@ -1,0 +1,166 @@
+{
+  "sha256": "f2c80013ea78f91bc878ea5338081ce42f48bad2b8f4690430d0bc9cb8617980",
+  "files": [
+    {
+      "file": "19-scoped-mask-stages.md",
+      "sha256": "5cde0dfe43fa3ddb5a59a914e2ed3c6af4c3d1a30067273714f25ac00dd74a44"
+    },
+    {
+      "file": "18-mask-supplement.md",
+      "sha256": "bbd25d34025ed5dbc0a21312eb553bd9ee86cd9d8d37536787260ddec2b78f0a"
+    },
+    {
+      "file": "03-policy-format.md",
+      "sha256": "428c8386ea865abd32cd9959e2c7dda6d2af9537ffcbdb625f93ce86763c2116"
+    },
+    {
+      "file": "15-contract-completion.md",
+      "sha256": "1009913756d8511cd9d0f5b09377d1ce035769989147f74eabe54ef4a8cdfd33"
+    },
+    {
+      "file": "16-handoff.md",
+      "sha256": "080f40cee9c6dfbc1040433bc04d811afe8dbc681da5bd35b5ae4f2f2d2de798"
+    },
+    {
+      "file": "11-acceptance.md",
+      "sha256": "6587ad5d1f7d49d2b1171cc9a951c7581f716708d0e3a863ef707d05114bba2b"
+    },
+    {
+      "file": "contracts/README.md",
+      "sha256": "49e67b3e4d63c5b38619f996cec8409e1fbf8589ad268820ce528ef452155067"
+    },
+    {
+      "file": "reviews/round-3/rubric.md",
+      "sha256": "35b0f8081ac3dc3f5b815204a17de0d1f82b7b6ae7ce0f34ba0e50de0c7979e0"
+    },
+    {
+      "file": "contracts/acl.schema.json",
+      "sha256": "3967c1781169b0e4ca87739f41892a90166efd06a2803fcc1139b19c53bdc14f"
+    },
+    {
+      "file": "contracts/adjacent-include-stages.json",
+      "sha256": "86e90d4c31b1fe265902c27f6aa9df127a4248f0aee28aec091e06dc83ccca5f"
+    },
+    {
+      "file": "contracts/evidence-request.json",
+      "sha256": "55b9e55e41c27fe3613c2020451d9e039e91be00fa55a9ebbe3047ee39d74bc4"
+    },
+    {
+      "file": "contracts/evidence-response.json",
+      "sha256": "2a646096b8eec09788b7ca51c0d59f243f239c06a1a1b35d6402fe7823b5eb7f"
+    },
+    {
+      "file": "contracts/fixtures.json",
+      "sha256": "369c0b20214a253244c65f38b68d871759909ea8a08b056865e53c2b1c214de7"
+    },
+    {
+      "file": "contracts/inspect-request.json",
+      "sha256": "1aaa15fc6172414eadcec690ea51c5977545d39963ae51f4016c44134903cd82"
+    },
+    {
+      "file": "contracts/inspect-result.json",
+      "sha256": "dbfc105e2c6d3a5bf8bf84b1b18f80232ba33b8f693c56ed007b321748dd3863"
+    },
+    {
+      "file": "contracts/invalid-empty-stages.json",
+      "sha256": "8480a931e41917ed57ec4ef60830c499507fe4cd2a04e03aaf996de7acabb011"
+    },
+    {
+      "file": "contracts/invalid-fields-and-mask.json",
+      "sha256": "628751e034e0022d132c7c60fffae8150258660a2a69c254fad8cad5a805b582"
+    },
+    {
+      "file": "contracts/invalid-first-exclude.json",
+      "sha256": "e172522684fb9a0203d19c0c0e4c901def8e76ed4008dcf54a9b46cc6a047d97"
+    },
+    {
+      "file": "contracts/invalid-flat-mask.json",
+      "sha256": "921d865f1511cf7f066463826983ab9e64c083f8a746c54880db4c80ce2c085d"
+    },
+    {
+      "file": "contracts/invalid-mixed-stage.json",
+      "sha256": "b4daa48454ec6421ab3d2fc6621570ec9a3e86cacab63e548370a1101510f0f8"
+    },
+    {
+      "file": "contracts/invalid-reference-expression.json",
+      "sha256": "ebc86588f7facc02c89a0e1e14eb5b8014e8489b562c2ba5568d7cc807917757"
+    },
+    {
+      "file": "contracts/invalid-sample-allow.json",
+      "sha256": "ee5dbf57ce20adc78a414681a140491ab3c4fc4007e69f954299ff0a6eb3b721"
+    },
+    {
+      "file": "contracts/mask-policy.canonical.yaml",
+      "sha256": "4adafe2ff5c13f52bc8e5f88c659f398935dd992b2fd7f54a742055a97a130c1"
+    },
+    {
+      "file": "contracts/mask-policy.json",
+      "sha256": "14552fe01faf011414b02a56d3e87ee93559de865f05183efc8251d43307bbdf"
+    },
+    {
+      "file": "contracts/mask-restriction-result.json",
+      "sha256": "be6936bf7e708a3cc24248e306f994eeea5c8d1e5b6b25f6f52bc88a925b5750"
+    },
+    {
+      "file": "contracts/opaque-plan-result.json",
+      "sha256": "fefd75c54d76eacdc26b4c6cb2db39b6475c5a01040d0122c474715c5014b214"
+    },
+    {
+      "file": "contracts/policy.canonical.yaml",
+      "sha256": "08916460e530fcd69d22cd6097f673e13430ceb634ecf31cf29e61bea05b1419"
+    },
+    {
+      "file": "contracts/policy.json",
+      "sha256": "3d67be67c9ddfc38fa2e49181084879d09b24d38951f216d988027f729f6e7e6"
+    },
+    {
+      "file": "contracts/sample-empty.json",
+      "sha256": "b2a44e4f895646d915b95002713d5bd736a5442ac0c3190c8b4115328ba17ff9"
+    },
+    {
+      "file": "contracts/sample-request-s1.json",
+      "sha256": "dea4e33e13ed277ff1553a7c6f4c8ff980221a2ff19ff5c467ae391de9e6a263"
+    },
+    {
+      "file": "contracts/sample-result.json",
+      "sha256": "b5a9da065e0d34db7a1a7dad8604b8bb11c976f683faa260c33475c6e7ab920f"
+    },
+    {
+      "file": "contracts/sample-selection-field-denied.json",
+      "sha256": "1ce84b3943e903e6dcc39bc466c2d9b934dbc91288a802d184f35ddc20d00b8c"
+    },
+    {
+      "file": "contracts/sample-selection-route-denied.json",
+      "sha256": "aee463508289331da54844fe6c9f6f7b99c1cef99696506613cb1f0a7b949c58"
+    },
+    {
+      "file": "contracts/sample-selection-unavailable.json",
+      "sha256": "eaa238a3f55ee8661a604f2892ff90cc891de150ab5f89dd8cec0cc1d2286b4e"
+    },
+    {
+      "file": "contracts/sample-template-collision-avoided.json",
+      "sha256": "1d38e02440e6581bd95cd3428c7091b6e7cbe979adc2b6602b009257363b1d1c"
+    },
+    {
+      "file": "contracts/scoped-mask-vectors.json",
+      "sha256": "e5d8a62329fb0c2cf7470619e36457abe87282171a9c7bf41b0c66190264f869"
+    },
+    {
+      "file": "contracts/scoped-mask.json",
+      "sha256": "4514a1e284dddfed0ba80a8995764a386fab084944c6a44befb2cb3fd9e629a4"
+    },
+    {
+      "file": "contracts/semantic-vectors.json",
+      "sha256": "1879592a3bdba5ed995853c1d8bcda9799aa9bdc4430b7b42aadf06c29f96868"
+    },
+    {
+      "file": "contracts/valid-interior-mask.json",
+      "sha256": "317f37be641a2acfca15306849874c6cbafde05a9e65fbe5cde6aea5ee50233f"
+    },
+    {
+      "file": "contracts/validation.json",
+      "sha256": "8a4785deec39537398c29d4f25d3aa4bf7965dc875696ebd9cc759838dabcaa3"
+    }
+  ],
+  "jsonEncoding": "Input uses compact JSON views; manifest hashes original pretty artifact bytes."
+}

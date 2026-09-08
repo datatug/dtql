@@ -1,0 +1,197 @@
+{
+  "sha256": "7172e9e3703d589833c53b366ffd43f09c50436c94d41aa4906656b43b0989d3",
+  "files": [
+    {
+      "file": "03-policy-format.md",
+      "sha256": "428c8386ea865abd32cd9959e2c7dda6d2af9537ffcbdb625f93ce86763c2116"
+    },
+    {
+      "file": "11-acceptance.md",
+      "sha256": "41735b88b91a72029a943df3f9e756e2bd5a3735e0eedd0511a68e898ce9229e"
+    },
+    {
+      "file": "15-contract-completion.md",
+      "sha256": "1009913756d8511cd9d0f5b09377d1ce035769989147f74eabe54ef4a8cdfd33"
+    },
+    {
+      "file": "16-handoff.md",
+      "sha256": "080f40cee9c6dfbc1040433bc04d811afe8dbc681da5bd35b5ae4f2f2d2de798"
+    },
+    {
+      "file": "18-mask-supplement.md",
+      "sha256": "bbd25d34025ed5dbc0a21312eb553bd9ee86cd9d8d37536787260ddec2b78f0a"
+    },
+    {
+      "file": "19-scoped-mask-stages.md",
+      "sha256": "6687b147bd3ce6a3c30c2247059e45ff252f20ef8d7eaa6c8f1dc39bfe87ac3b"
+    },
+    {
+      "file": "contracts/README.md",
+      "sha256": "49e67b3e4d63c5b38619f996cec8409e1fbf8589ad268820ce528ef452155067"
+    },
+    {
+      "file": "contracts/acl.schema.json",
+      "sha256": "3967c1781169b0e4ca87739f41892a90166efd06a2803fcc1139b19c53bdc14f"
+    },
+    {
+      "file": "contracts/adjacent-exclude-stages.canonical.json",
+      "sha256": "2396dbdc781678236bbd1bf34eb2beaced8694df0a566667e386f38761418de6"
+    },
+    {
+      "file": "contracts/adjacent-exclude-stages.canonical.yaml",
+      "sha256": "4afcf576fbe0c1eeeec269afeee192d24ba0abb59c1d87a5857c75ea6dde3467"
+    },
+    {
+      "file": "contracts/adjacent-exclude-stages.json",
+      "sha256": "31007ce7059fd3a8e6df43b51bdb7c5aaf2b38e4fbc0672f012510075ec009d7"
+    },
+    {
+      "file": "contracts/adjacent-include-stages.canonical.json",
+      "sha256": "0116d57502322eaa368911246ccebd5c5b998fc1ec3a05d3e43d6830f67beba2"
+    },
+    {
+      "file": "contracts/adjacent-include-stages.canonical.yaml",
+      "sha256": "236bbf2322941c9e32cba593eefbe9ff69f627d2c006f417eb97dffafe84223a"
+    },
+    {
+      "file": "contracts/adjacent-include-stages.json",
+      "sha256": "86e90d4c31b1fe265902c27f6aa9df127a4248f0aee28aec091e06dc83ccca5f"
+    },
+    {
+      "file": "contracts/evidence-request.json",
+      "sha256": "55b9e55e41c27fe3613c2020451d9e039e91be00fa55a9ebbe3047ee39d74bc4"
+    },
+    {
+      "file": "contracts/evidence-response.json",
+      "sha256": "2a646096b8eec09788b7ca51c0d59f243f239c06a1a1b35d6402fe7823b5eb7f"
+    },
+    {
+      "file": "contracts/fixtures.json",
+      "sha256": "6389d8987b6f0454e62e4ded6918cfbbc0c46d4f768d554ac74dcb06df62b663"
+    },
+    {
+      "file": "contracts/inspect-request.json",
+      "sha256": "1aaa15fc6172414eadcec690ea51c5977545d39963ae51f4016c44134903cd82"
+    },
+    {
+      "file": "contracts/inspect-result.json",
+      "sha256": "dbfc105e2c6d3a5bf8bf84b1b18f80232ba33b8f693c56ed007b321748dd3863"
+    },
+    {
+      "file": "contracts/invalid-empty-stages.json",
+      "sha256": "8480a931e41917ed57ec4ef60830c499507fe4cd2a04e03aaf996de7acabb011"
+    },
+    {
+      "file": "contracts/invalid-fields-and-mask.json",
+      "sha256": "628751e034e0022d132c7c60fffae8150258660a2a69c254fad8cad5a805b582"
+    },
+    {
+      "file": "contracts/invalid-first-exclude.json",
+      "sha256": "e172522684fb9a0203d19c0c0e4c901def8e76ed4008dcf54a9b46cc6a047d97"
+    },
+    {
+      "file": "contracts/invalid-flat-mask.json",
+      "sha256": "921d865f1511cf7f066463826983ab9e64c083f8a746c54880db4c80ce2c085d"
+    },
+    {
+      "file": "contracts/invalid-mixed-stage.json",
+      "sha256": "b4daa48454ec6421ab3d2fc6621570ec9a3e86cacab63e548370a1101510f0f8"
+    },
+    {
+      "file": "contracts/invalid-reference-expression.json",
+      "sha256": "ebc86588f7facc02c89a0e1e14eb5b8014e8489b562c2ba5568d7cc807917757"
+    },
+    {
+      "file": "contracts/invalid-sample-allow.json",
+      "sha256": "ee5dbf57ce20adc78a414681a140491ab3c4fc4007e69f954299ff0a6eb3b721"
+    },
+    {
+      "file": "contracts/mask-policy.canonical.yaml",
+      "sha256": "ae7d9079972ecc382dd902631ca15f392ec8ae0060bd4f50f98fa6fe568a36de"
+    },
+    {
+      "file": "contracts/mask-policy.json",
+      "sha256": "14552fe01faf011414b02a56d3e87ee93559de865f05183efc8251d43307bbdf"
+    },
+    {
+      "file": "contracts/mask-restriction-result.json",
+      "sha256": "be6936bf7e708a3cc24248e306f994eeea5c8d1e5b6b25f6f52bc88a925b5750"
+    },
+    {
+      "file": "contracts/opaque-plan-result.json",
+      "sha256": "fefd75c54d76eacdc26b4c6cb2db39b6475c5a01040d0122c474715c5014b214"
+    },
+    {
+      "file": "contracts/policy.canonical.yaml",
+      "sha256": "08916460e530fcd69d22cd6097f673e13430ceb634ecf31cf29e61bea05b1419"
+    },
+    {
+      "file": "contracts/policy.json",
+      "sha256": "3d67be67c9ddfc38fa2e49181084879d09b24d38951f216d988027f729f6e7e6"
+    },
+    {
+      "file": "contracts/sample-empty.json",
+      "sha256": "b2a44e4f895646d915b95002713d5bd736a5442ac0c3190c8b4115328ba17ff9"
+    },
+    {
+      "file": "contracts/sample-request-s1.json",
+      "sha256": "dea4e33e13ed277ff1553a7c6f4c8ff980221a2ff19ff5c467ae391de9e6a263"
+    },
+    {
+      "file": "contracts/sample-result.json",
+      "sha256": "b5a9da065e0d34db7a1a7dad8604b8bb11c976f683faa260c33475c6e7ab920f"
+    },
+    {
+      "file": "contracts/sample-selection-field-denied.json",
+      "sha256": "1ce84b3943e903e6dcc39bc466c2d9b934dbc91288a802d184f35ddc20d00b8c"
+    },
+    {
+      "file": "contracts/sample-selection-route-denied.json",
+      "sha256": "aee463508289331da54844fe6c9f6f7b99c1cef99696506613cb1f0a7b949c58"
+    },
+    {
+      "file": "contracts/sample-selection-unavailable.json",
+      "sha256": "eaa238a3f55ee8661a604f2892ff90cc891de150ab5f89dd8cec0cc1d2286b4e"
+    },
+    {
+      "file": "contracts/sample-template-collision-avoided.json",
+      "sha256": "1d38e02440e6581bd95cd3428c7091b6e7cbe979adc2b6602b009257363b1d1c"
+    },
+    {
+      "file": "contracts/scoped-mask-vectors.json",
+      "sha256": "34084fa2fd10c231509113e1ee85ca18ebb3959b346438c7604898c7d74711be"
+    },
+    {
+      "file": "contracts/scoped-mask.json",
+      "sha256": "4514a1e284dddfed0ba80a8995764a386fab084944c6a44befb2cb3fd9e629a4"
+    },
+    {
+      "file": "contracts/semantic-vectors.json",
+      "sha256": "1879592a3bdba5ed995853c1d8bcda9799aa9bdc4430b7b42aadf06c29f96868"
+    },
+    {
+      "file": "contracts/three-stage-mask-result.json",
+      "sha256": "4f365ee90e398b5ea9c73243672e636d5b3629e41b1db2b598c84c40ad590e60"
+    },
+    {
+      "file": "contracts/three-stage-procedure-policy.json",
+      "sha256": "02617ef6e157c617e16179fba4f93300c33db11e873b81fd480d250c3ff05339"
+    },
+    {
+      "file": "contracts/valid-interior-mask.json",
+      "sha256": "317f37be641a2acfca15306849874c6cbafde05a9e65fbe5cde6aea5ee50233f"
+    },
+    {
+      "file": "contracts/validation.json",
+      "sha256": "45c7db2377d9f9b59c9fa54ef8bd756f0bfda6568c27ad35cb3b1593d52d63e1"
+    },
+    {
+      "file": "reviews/round-3/correction-ledger.md",
+      "sha256": "cffb6232277b6a22eb2bf74bbde1830655a45150413999e4be9e7958395dbd81"
+    },
+    {
+      "file": "reviews/round-3/rubric.md",
+      "sha256": "35b0f8081ac3dc3f5b815204a17de0d1f82b7b6ae7ce0f34ba0e50de0c7979e0"
+    }
+  ]
+}

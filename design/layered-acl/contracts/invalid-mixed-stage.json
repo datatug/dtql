@@ -1,0 +1,12 @@
+{
+  "stages": [
+    {
+      "include": [
+        "*"
+      ],
+      "exclude": [
+        "sys_*"
+      ]
+    }
+  ]
+}

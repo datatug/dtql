@@ -1,0 +1,8 @@
+{
+  "packetDigestVerified": true,
+  "manifestFilesVerified": 40,
+  "exampleSetArithmeticVerified": true,
+  "structuralFixtures": 25,
+  "canonicalYAMLFixtures": 2,
+  "runtimeACLImplemented": false
+}

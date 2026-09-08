@@ -85,13 +85,68 @@
     "valid": false
   },
   {
-    "file": "invalid-interior-mask.json",
+    "file": "valid-interior-mask.json",
     "definition": "policy",
-    "valid": false
+    "valid": true
   },
   {
     "file": "mask-restriction-result.json",
     "definition": "result",
+    "valid": true
+  },
+  {
+    "file": "scoped-mask.json",
+    "definition": "collectionMask",
+    "valid": true
+  },
+  {
+    "file": "adjacent-include-stages.json",
+    "definition": "collectionMask",
+    "valid": true
+  },
+  {
+    "file": "invalid-first-exclude.json",
+    "definition": "collectionMask",
+    "valid": false
+  },
+  {
+    "file": "invalid-empty-stages.json",
+    "definition": "collectionMask",
+    "valid": false
+  },
+  {
+    "file": "invalid-mixed-stage.json",
+    "definition": "collectionMask",
+    "valid": false
+  },
+  {
+    "file": "invalid-flat-mask.json",
+    "definition": "collectionMask",
+    "valid": false
+  },
+  {
+    "file": "adjacent-exclude-stages.json",
+    "definition": "collectionMask",
+    "valid": true
+  },
+  {
+    "file": "adjacent-include-stages.canonical.json",
+    "definition": "collectionMask",
+    "valid": true
+  },
+  {
+    "file": "adjacent-exclude-stages.canonical.json",
+    "definition": "collectionMask",
+    "valid": true
+  },
+  {
+    "file": "three-stage-mask-result.json",
+    "definition": "result",
+    "valid": true
+  },
+  {
+    "file": "three-stage-procedure-policy.json",
+    "definition": "policy",
     "valid": true
   }
 ]

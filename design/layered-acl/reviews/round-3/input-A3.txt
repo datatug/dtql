@@ -1,0 +1,1041 @@
+# A3 identical independent delta-review rubric
+
+Review only this scoped-mask delta; the preceding A2/S1 architecture was independently reviewed/reconciled/correction-verified. User explicitly corrected flat exclude-wins masks to scoped include/exclude stages and confirmed **d means *d without recursive paths. This packet contains exact current relevant documents, compact JSON views of exact schema/fixtures, and the previously audited matcher excerpt. No runtime implementation is underway.
+
+Independently assess correctness/security, reuse of existing DALgo, interoperability/canonicalization, privacy/evidence, DataTug editing, work-package feasibility, test completeness and bounded MVP scope. Focus: adjacent same-action grouping, a later include confined to previous selected set, stage order, cross-policy intersection, nested field parent/descendant effects, legacy behavior, arbitrary-position globs, finite operational budgets with variable-length syntax, mask transport completeness. Do not reopen settled unrelated A2 choices or count existing explicit protections as missing.
+
+No external source/live-repo lookup, other review or file edits. Return concise report <=1800 words: verdict ready/ready-with-changes/not-ready, stable A3-/O3- IDs, severity critical/high/medium/low/future, exact evidence, concrete counterexample and recommended bounded action, whether freeze blocker. State limitations; no invented tests/telemetry. Both reviewers receive identical input, never peer findings. Separate reconciler de-duplicates, accepts/rejects/defers, flags true human decisions, evaluates unique value and actual exposed usage/cost; do not invent a third architecture. Original task forbids implementation before human sign-off.
+
+===== 19-scoped-mask-stages.md =====
+# A3 amendment — scoped alternating include/exclude stages
+
+Status: user-directed semantic correction after the A2/S1 review checkpoint. This amendment is not covered by those reviews and is not an implementation authorization. It supersedes the flat "exclusions always win" proposal for new masks. The reviewed legacy fields behavior, policy hierarchy and restrictive composition across owners remain unchanged. Existing frozen review inputs/manifests remain historical evidence; schemas and executable package fixtures are revised below and the delta must be reviewed before a new contract freeze.
+
+## Selected-set semantics
+
+A mask consists of a variable-length list of stages. Each stage holds an include or exclude action and a list of patterns. Patterns within the same stage are ORed. Every following opposite-action stage applies only to the exact set matched by the previous stage, including all ancestor constraints. It cannot select names outside that set. Inclusion may therefore restore part of a preceding exclusion, without becoming a global override.
+
+For the user's example:
+
+```text
+include a*, b*
+  exclude *c*
+    include **d, a*f
+```
+
+Let A be names starting with a or b, C names containing c, and D names ending in d or matching a*f. The permitted set is:
+
+```text
+(A minus C) union (A intersect C intersect D)
+```
+
+Equivalently, start excluded. For a particular name, process the stages from the beginning: if it matches a stage, set its inclusion state to that stage's action and continue; at the first nonmatching stage, stop and keep the last applicable state. This is bounded name matching, not enumeration of a database or schema. A deeper include cannot override a denial in a different mandatory policy or layer.
+
+| Name | Reason | Included? |
+|---|---|---|
+| apple | Initial include; does not match the exclusion | yes |
+| bacon | Initial include, then contains c; no restoring pattern | no |
+| abcd | Initial include, excluded by c, restored by ending d | yes |
+| acf | Initial include, excluded by c, restored by a*f | yes |
+| bdf | Initial include; exclusion never applies | yes |
+| zcd | Outside initial selected set, despite matching later patterns | no |
+
+## Portable shape
+
+Use the same stage form for procedure names, collection names and column patterns:
+
+```yaml
+stages:
+  - include: ["a*", "b*"]
+  - exclude: ["*c*"]
+  - include: ["**d", "a*f"]
+```
+
+Each stage has exactly one action key with a nonempty pattern list. Stage order is semantic and MUST be preserved through editing/serialization. Consecutive entries of the same type form one OR-list and can be canonically merged before evaluating the next action change; they are not successively intersected. The initial stage is include; "all except sys_*" is include:["*"] followed by exclude:["sys_*"]. An omitted mask retains its existing no-extra-restriction meaning; an empty explicit stage list is invalid rather than unrestricted.
+
+There is no fixed semantic number of stages or patterns. Owners still advertise operational input/depth/work budgets and reject excessive requests explicitly; they must never silently truncate the list or drop later exclusions. The reference deployment advertises maxMaskStages=1024 and maxMaskPatterns=4096 per policy document before normalization, maxMaskPatternBytes=128; owners may configure other finite supported limits and clients discover them. The schema has variable-length arrays without a semantic maximum. The existing whole-policy/body and execution/dry-run deadlines still apply. Reject overload at validation or return explicit budget failure; never truncate or treat partial mask evaluation as allow. Stages are a flat list, so predicate AST depth16 does not limit stage count.
+
+## Pattern grammar correction
+
+The user's *c* and a*f require interior and multiple wildcard positions, which the reviewed S1 one-edge-star restriction rejected. New mask syntax therefore supports ordinary anchored glob `*` at any position within a name/field segment. Each * matches zero or more characters. Consecutive stars, including **d, mean the same as one star (*d); they do not introduce recursive path traversal. The user confirmed this interpretation; it is not a recursive path language. Collection/procedure names remain canonical single segments; column dots separate nested segments. Wildcards never cross those structural boundaries.
+
+Extend DALgo's parsed mask machinery for the new profile, preserving its legacy fields parser/matcher. Use bounded glob matching without backtracking regex construction. Do not enumerate all schema fields to compile away the stages. Parent-object projection versus complete evidence, affected-descendant write checks and scalar-reference restrictions from S1 continue to apply against the final staged decision. A restored child does not imply that the whole parent is readable.
+
+## Impact on plan and review
+
+WP1: replace flat new-mask schemas/restriction DTOs with staged masks, exact validation and round-trip examples; preserve semantic stage order. Include all rows above, adjacent same-type OR grouping, further alternation, wildcard normalization and budget-exceeded rejection.
+
+WP2/3: extend the reusable DALgo mask representation/evaluator; verify equivalent two-stage behavior for existing flat examples; retain legacy fields compatibility and cross-policy intersection. Record per-stage path/index attribution internally for Explain without requiring English text. Public diagnostics preserve private-policy and row-fact protection.
+
+WP4/5/6: transport/persist the same AST, enforce actual collection/column/procedure gate decisions at their owners, never flatten away nested exceptions or permit a higher owner to grant a lower denial.
+
+WP7: ordered stage editor showing each stage's selected parent set; preserve multiple patterns as one OR-list; warn that moving a stage changes meaning. Do not offer an unordered pair of include/exclude boxes as a faithful editor for this representation.
+
+WP8/T21: actual read/write and disclosure tests for include→exclude→include at each owner/hop, nested-field evidence/redaction, and a deeper include that cannot bypass a different mandatory layer's exclusion. Native effects execution remains unsupported in MVP.
+
+The previous ready-for-sign-off assessment applies to the earlier flat-mask revision only. This new mask contract must receive the same independent delta review/reconciliation before implementation dispatch.
+
+## Exact integration and canonical form
+
+collectionMask and fieldMask both use `{stages:[stage,...]}`. Stored-procedure execution entries use `{class:stored_procedure,namespace,mask:{stages:[...]}}`; DTQL/native class-only entries stay unchanged. Reject duplicate execution entries for the same class/namespace rather than allow a second entry to bypass an exception chain. The A2 flat include/exclude form was never implemented or released; it is not accepted as an ambiguous alternative in the new schema. Its examples migrate exactly to include then exclude stages.
+
+Stage object: exactly one key include or exclude with a nonempty string array; unknown keys reject. First raw stage must include. Before evaluation, merge each maximal consecutive run of the same action by unioning its patterns; this establishes the selected set for the next opposite-action stage. Only then apply scoped stages. Canonical serialization collapses consecutive stars within segments, sorts/deduplicates patterns within each merged stage, preserves order of action changes, and never sorts stages. Both JSON and YAML refer to the same normalized AST. Raw formatting/comments remain out of scope.
+
+Scalar name matching uses canonical Unicode characters, exact case and anchored glob semantics. * may occur anywhere and matches zero or more characters in that segment, never a dot/path separator. New masks reject surrounding whitespace, controls, escapes, ? and character classes. nameMask is one canonical procedure/collection segment; fieldPattern is dotted segments with existing parent-prefix matching. A pattern matching a parent continues to select its descendants, but child stage selection and restoration are always evaluated on the concrete field path under all prior selections. Legacy fields parsing/grammar remains unchanged.
+
+C2 field_mask restriction still uses representation mask, but mask now contains stages. Do not emit a flattened include-minus-exclude approximation. Ordinary blockers remain ACL_COLLECTION_DENIED/ACL_COLUMN_DENIED/ACL_CALLABLE_DENIED with owner/policy provenance; the evaluator may retain stage indexes internally, but no required new English text or public diagnostic fields are needed. If a disclosed mask is too large or private, return the existing opaque reference; never disclose only its positive stages.
+
+Complete parent-object evidence remains conservative: if any descendant exclusion can apply under the staged mask, reject whole-parent evidence unless complete-subtree authorization can be proven. MVP need not implement a glob-language inclusion solver; it may conservatively reject such parent evidence even if a later stage would restore every excluded descendant. Concrete authorized leaf evidence remains possible. A parent's being projectable does not make it complete evidence. Scalar-only query references and final affected-descendant write checks remain mandatory. No stage can restore a value denied by another mandatory policy or owner.
+
+The standard deny-column UI continues to offer a fixed explicit fields list. Advanced staged masks show the initial selection and successive scoped exceptions, preserve action-change order and distinguish future-field wildcard inclusion. Stage reordering changes policy meaning; saves validate and persist at the owner with normal revision CAS. Unknown/stale clients must not edit a staged mask through flat controls.
+
+===== 18-mask-supplement.md =====
+# Collection and column masks — integration requirements
+
+A3 [scoped stages](19-scoped-mask-stages.md) supersedes the earlier flat include/exclude syntax and unconditional exclusion precedence. This document retains the security and integration obligations reviewed in A2/S1. The exact original S1 is preserved in reviews/round-2/input-A2-S1.txt.
+
+## Reuse verified against existing DALgo
+
+At audited DALgo commit `6b0be09b95bd3afc90309763671791e17264dffe`, `access/fields.go` already parses per-segment literal, `*`, prefix* and *suffix masks, supports dotted paths/parent descendants, and intersects `fieldSets`. It has no exclusion set. Extend that same parsed representation with exclusions and reuse its segment matcher; preserve legacy `fields` behavior. Do not expand masks into a schema snapshot or add a competing evaluator.
+
+New masks extend the same parsed machinery with scoped stages and arbitrary-position segment stars under 19. Legacy fields keep their old grammar. Lists are variable length with advertised operational budgets; no later stage may be silently dropped.
+
+## Collection mask
+
+Add optional `collectionMask:{stages:[stage,...]}` to AccessPolicy. It is a **mandatory conjunctive admission gate**, like execution, not a wildcard path with invented specificity. It applies to every data operation assessed by that policy, irrespective of which bound rule allows it. Omission adds no collection gate. When present, evaluate the normalized owner collection through the scoped stage chain in 19. Later inclusion can restore only its preceding excluded subset. No match is `ACL_COLLECTION_DENIED` with table scope; another independent policy or owner cannot override it.
+
+MVP targets single root collections. Match canonical collection base name resolved from the parsed query/key, not caller display aliases; preserve the owner's database identity. Existing `path`/rule hierarchy still decides ordinary operations, row/field restrictions and bindings. The collection gate cannot grant an ordinary action that the policy denies. Nested/collection-group/native requests whose touched collections cannot be fully resolved are unsupported under this profile, never treated as matching `*`.
+
+Example complete narrowing policy (applicable to all authenticated subjects already admitted by other mandatory policies):
+
+```yaml
+apiVersion: dtql.org/access/v1
+kind: AccessPolicy
+metadata:
+  name: public-customer-surface
+  visibility: public
+target:
+  database: crm
+composition: dalgo-hierarchical-v1
+default: deny
+collectionMask:
+  stages:
+    - include: ["*"]
+    - exclude: ["sys_*"]
+execution:
+  allow:
+    - class: dtql
+scopes:
+  - path: /
+    rules:
+      - id: surface
+        effect: allow
+        operations: [get, exists, query, insert, set, update, delete]
+        fieldMask:
+          stages:
+            - include: ["*"]
+            - exclude: ["secret_*", "address.internal_*"]
+```
+
+This narrows access to non-sys_ root collections and permitted columns. It does not replace the required tenant/country/workflow policies or grant the actions they deny. For only User_* collections, use a single include:["User_*"] stage. Schema discovery applies this gate before collection enumeration/pagination. Public policy text intentionally discloses its mask literals subject to ordinary policy read authority.
+
+## Column mask
+
+Add optional `fieldMask:{stages:[stage,...]}` to an **allow** rule, mutually exclusive with legacy-compatible `fields`. Deny rules forbid both. `fields:[...]` retains exact existing semantics and is not silently reserialized as fieldMask. A fieldMask parses to a staged restriction within the existing fieldSet machinery. Use the selected-set algorithm in 19. A matching parent pattern covers descendants; subsequent scoped stages may exclude or restore a subset. Independent field sets still intersect. A literal dotted field pattern always means nested segments, never a literal dot in a physical key. Reject ambiguous physical keys at protected normalization/evidence boundaries as specified in C1.
+
+Column patterns reuse current DALgo dotted segment grammar and parent/subtree semantics: `address.*` selects descendants and current parent-prefix behavior; `address.internal_*` excludes matching nested fields and their descendants. The implementation must not return an object wholesale just because its parent is included: recursively redact excluded descendants. Setting/replacing a parent validates every affected descendant, including removed fields; a finally excluded child blocks whole-object replacement even if its value is unchanged when the operation touches it. Arrays and complex provider paths are unsupported unless existing conformance proves complete affected-path handling.
+
+Apply masks to explicit projections, filter/sort references, evidence coverage, schema visibility and actual write field paths. Query allow alternatives retain DALgo's conservative **intersection**, now intersecting each fully evaluated staged set; point/write decisions retain the first deciding rule. No union of different policies' includes can defeat another's exclusion. For wildcard reads recurse/project safely before emitting data. A new column matching include:["*"] is allowed unless excluded; explicit legacy field lists continue to deny unlisted new fields. The UI must show this difference instead of promising that every future column defaults denied.
+
+C2 adds restriction kind `field_mask`, representation `mask`, with required mask:{stages} and no expression/fields/omissionReason. A private or oversized mask becomes a coalesced reference, with kind field_mask or opaque, following the same privacy rules. Existing field_allowlist/fields variant remains. Collection gates are static operation decisions/blockers; no residual mask is needed for the single resolved collection. Return `ACL_COLUMN_DENIED` for excluded columns, not a second column taxonomy. Column names in diagnostics still require safe request/evidence disclosure.
+
+## Implementation and acceptance delta
+
+WP1 adds schema/round-trip/golden and negative fixtures for collectionMask/fieldMask, mask restriction variant and ACL_COLLECTION_DENIED. WP2a extends the existing pattern parser/fieldSet and document AST; WP2b evaluates mandatory collection gates. WP3a/b applies exclusion-aware `allows` everywhere, including enumerable projection fast paths, recursive redaction, query references and affected-path validation. Do not use old enumerable optimization if it would bypass exclusions; conservative fallback stays bounded and enforces before result publication. WP4/5 schema discovery applies gates; WP7 forms preserve stage order and each stage's pattern list and warn about future-field wildcard inclusion. WP8 tests actual protected queries and updates, not mask serialization alone.
+
+T21 (mandatory): (a) sys_a collection excluded while User_a included; direct lower owner enforces despite upper allow; (b) include * exclude secret_* read omits secret_token, explicit selection/filter/sort reject, UPDATE secret_token denied; (c) include address.* exclude address.internal_* recursively hides/denies internal_code and prevents parent replacement/removal bypass; (d) add a new public field and new secret_ field, verify wildcard behavior after schema reload; (e) multiple matched policies/alternatives cannot union away an exclusion; (f) canonical edit→owner persist→restart→Explain→real query→UPDATE keeps both mask sets; (g) private mask details/count remain hidden, and unsupported nested collection/array operations fail closed. Existing T01–T20/V01–V08 remain required.
+
+C7 review must assess these masks in the same current policy engine and reject unsafe enumerable/subtree shortcuts. No query-text matching, arbitrary SQL effects parser or standalone mask service is introduced.
+
+## Post-review contract clarification
+
+The following closes the parent-evidence ambiguity identified in AS-01. The same parsed mask set exposes distinct checks for a projectable parent, an entirely readable value and a permissible scalar query reference. Wildcard projection may recursively redact a parent. Evidence for an object parent requires authorization for its **complete possible subtree**, not merely the currently present leaves; if any descendant exclusion can apply, reject that parent evidence request even when the excluded child happens to be absent. Request authorized concrete descendant paths instead. Never return a redacted parent as a complete present value, and never infer excluded child absence from the projection. Whole-object filter/order/predicate references are unsupported in the scalar query profile.
+
+New masks reject leading/trailing whitespace rather than silently trim it; preserve legacy fields parser behavior. nameMask is one segment; fieldPattern is a dotted sequence with existing parent/subtree behavior. Merge adjacent same-action stages and sort/deduplicate their pattern lists, preserving action-change order, as defined in 19. Preserve original legacy fields canonicalization; `address` and `address.*` remain equivalent parent-prefix inclusions as in current DALgo.
+
+For fieldMask writes, enumerate affected paths from pre-image and final candidate below every touched parent, including removed and unchanged touched descendants. Unknown/opaque composite coverage or unsupported arrays yields ACL_ENFORCEMENT_UNSUPPORTED. Reads recursively redact before publication; disable the enumerable fast path for every exclusion-bearing mask in MVP (a safe optimization can follow later). Remote parent replacement requires complete evidence for every affected subtree and cannot rely on changed-path names alone. Explicit query/evidence scalar references must be complete and authorized, not merely projectable containers.
+
+Disclose the entire field_mask include/exclude expression only with owner policy-read authority for the policy and, if private, owner policy-admin authority. Otherwise return not_authorized opaque reference; **never return only the includes as a weaker admission condition**. Public policy-read may intentionally reveal public mask literals despite separately filtered schema metadata. This is the existing public-policy visibility decision, not anonymous disclosure.
+
+The standard UI deny-column action retains an explicit legacy allow-list; advanced mask editing is a separately labelled mode with a persistent explanation that include:* admits future nonexcluded columns. T21 tests both forms after adding columns. Unresolved/nested collection targets under this MVP profile use ACL_ENFORCEMENT_UNSUPPORTED with operation scope, never ACL_COLLECTION_DENIED; the latter only denotes a resolved name failing a collection gate. Migration docs record root-only collection masks.
+
+T21 executes each applicable case via direct InGitDB, embedded OVDB and remote DataTug, and case (e) combines two mandatory owners plus two within-policy alternatives. Add the included-address/excluded-internal child evidence case with that child both present and absent, array/opaque value rejection, whitespace rejection and legacy parent/subtree differential fixtures. T21's document/schema changes are completed in the final contract artifacts before freeze, not left for divergent downstream agents.
+
+===== 03-policy-format.md =====
+# DTQL ACL policy format and semantics — proposed v1
+
+Contract C1. Proposed `apiVersion: dtql.org/access/v1`; this identifier is a version discriminator, not a claim that a public schema URL is already deployed. DTQL owns this portable contract; DALgo supplies its first conforming implementation. `dalgo.io/access/v1` remains accepted by existing legacy decoders. Do not silently reinterpret or rewrite legacy documents.
+
+## Reuse and representation
+
+Canonical editable text is UTF-8 YAML 1.2 in its JSON-compatible subset; JSON represents the same abstract document. This adopts DALgo's existing document and condition shape rather than creating a policy DSL. The first portable profile supports existing hierarchical allow/deny, row `where/check`, field **allow-lists**, and principal bindings. The [reviewed mask extension](18-mask-supplement.md) adds collection and column include/exclude sets within the same evaluator. A UI “deny column” action produces an explicit allowed-field restriction in a separate policy against the current schema; it never invents a `deny fields` rule that DALgo cannot execute. New fields stay denied by that explicit list. Predicate-bearing deny rules are unsupported in this profile; represent positive admissible rows rather than introducing negation semantics.
+
+```yaml
+apiVersion: dtql.org/access/v1
+kind: AccessPolicy
+metadata:
+  name: tenant-access
+  visibility: private
+target:
+  database: crm
+composition: dalgo-hierarchical-v1
+default: deny
+ruleSets:
+  editor:
+    - path: /customers
+      rules:
+        - id: read-tenant
+          effect: allow
+          operations: [get, exists, query]
+          where:
+            op: "=="
+            left: {field: tenant}
+            right: {param: tenant}
+        - id: update-tenant
+          effect: allow
+          operations: [update]
+          where:
+            op: "=="
+            left: {field: tenant}
+            right: {param: tenant}
+bindings:
+  users:
+    user-alice: [editor]
+  roles:
+    crm-editor: [editor]
+  groups:
+    crm-team: [editor]
+```
+
+The example names an opaque user in the configured identity realm. Real deployment uses its established ID, not an OAuth subject or display name. `tenant` is a host-resolved trusted authorization attribute, never a query-supplied parameter. This policy denies operations not explicitly granted; a fixture requiring other operations supplies corresponding rules.
+
+## Document grammar
+
+All maps reject unknown keys. Keys are case-sensitive. Nonempty strings are bounded to 256 UTF-8 bytes unless otherwise specified. IDs use `[A-Za-z0-9][A-Za-z0-9._-]{0,127}` for policy/rule/rule-set IDs. Principal binding keys are opaque strings bounded to 256 bytes, interpreted within the owner's realm; they need not obey the policy ID grammar.
+
+| Field | Required type and meaning |
+|---|---|
+| `apiVersion` | Exact string `dtql.org/access/v1`. |
+| `kind` | Exact `AccessPolicy`; audit-selection policies remain separate and never authorize data. |
+| `metadata` | Object with required `name`, stable policy ID; optional `description` ≤2048 bytes, non-normative author text; optional `visibility: private|public`, default public. |
+| `target` | Object with required `database`: exact local owner database ID. No regex or wildcard in MVP. Mount aliases resolve server-side to the owner's database ID before evaluation. |
+| `composition` | Required exact `dalgo-hierarchical-v1`; unknown value rejects. Across documents composition is always intersection. |
+| `default` | Required exact `deny`. |
+| `scopes` | Nonempty scope array for a policy applying to every principal; mutually exclusive with `ruleSets/bindings`. |
+| `ruleSets` | Nonempty map of rule-set ID to nonempty scope array, required with `bindings`. |
+| `bindings` | Object with `users`, `roles`, `groups` maps to nonempty arrays of existing rule-set IDs, and optional `everyone` array. At least one binding required. Matched sets deduplicated. |
+
+A scope has exactly one selector `path` (string), `collectionGroup` (string), or `opaqueQuery: true`, plus nonempty `rules` and/or child `scopes`. MVP wire interchange can preserve the latter two legacy selectors, but loading either into an enabled protected owner rejects the complete candidate set as ACL_CONFIGURATION_INVALID; never ignore an unsupported scope. Representable unconditional truncate rules may load, but invoking truncate is always unsupported in the protected profile, so such rules cannot reopen an execution path. A disabled legacy source does not thereby gain the new profile's conformance claim.
+
+A rule has required `id`, `effect` (`allow` or `deny`), `operations` (nonempty array); optional `where`, `check`, `fields`. IDs are unique within a plain policy and within each rule set; the qualified rule ID is `ruleSet/rule` for bindings. `fields` is a nonempty array of patterns; absence means all fields, and explicit `[]` rejects to avoid omission/empty serialization ambiguity. `where/check/fields` are allowed only on `allow`. `check` without `where` constrains new data but not reads. Neither `where` nor `check` accepts explicit null.
+
+Leaf operations: `get`, `exists`, `query`, `insert`, `set`, `update`, `delete`, `truncate`. Authoring conveniences `read`, `write`, `readwrite` expand to the existing leaf sets. Conditional/field-restricted groups must canonicalize to explicit supported leaves and exclude truncate; explicit restricted truncate is invalid. New serializers emit explicit leaves in that order. Unknown operations reject. `truncate` is representable but not executable in MVP. CRUD on policy resources uses a separate administration action namespace, never these data grants.
+
+## Paths, fields, expressions
+
+Path selectors reuse DALgo alternating collection/record segments: `/customers`, `/customers/123`, `/spaces/{spaceID}/customers`. Scopes apply to descendants. Nested fragments append structurally; canonical output uses the same nested tree, not a semantic flattening. `*` and `{capture}` only occupy record-ID positions; `/**` is optional terminal inherited-subtree notation, not arbitrary glob syntax. Root `/` matches all logical resources. Only string record IDs are portable in this profile. IDs containing reserved separators use percent encoding decoded exactly once into structural segments; adapters must use the common normalizer, never filesystem string concatenation. Reject malformed encodings, empty segments, dot traversal, invalid wildcard placement and collisions after normalization. Preserve case; no Unicode/case-fold aliasing.
+
+Field names are dotted paths using DALgo's existing `fields` patterns (whole-segment `*`, permitted prefix/suffix wildcard forms). A concrete request uses field segment arrays on the wire, making nested `address.city` unambiguous. Literal dots in a segment, ambiguous pattern escapes and whole-object replacements under descendant-only grants are rejected by the portable profile until lossless common escaping is specified. MVP UI offers schema field checkboxes and exact names; it preserves read-only supported patterns rather than expanding arbitrary wildcard expressions into a lossy form.
+
+Conditions use exactly one of `{op,left,right}`, `{and:[conditions...]}`, `{or:[conditions...]}`. Groups must be nonempty. Left is `{field: name}`. RHS is `{value: scalar}`, `{values: [scalars...]}` for `In`, or `{param: name}`. Scalar: string, boolean, null, or finite number in the cross-runtime exact range; integers are limited to ±(2^53−1), with larger IDs encoded as strings. No arbitrary objects, YAML tags, timestamps or execution expressions. Comparisons are `==`, `In`, `>`, `>=`, `<`, `<=`. Missing fields do not match; explicit null only equals null, is not ordered. Numeric comparison uses numeric values without string coercion; incompatible types return a safe evaluation error. String ordering is UTF-8 lexical, not locale/collation-dependent. Adapters unable to match these semantics must reject the operation or use proven equivalent enforcement before paging.
+
+Authorization params are `currentUser`, `principal.roles`, `principal.groups`, `now`, declared host attributes such as `tenant`, and valid `path.<capture>`. Resolve each once from a trusted snapshot; a missing variable fails closed. `now` is a finite integer Unix timestamp in milliseconds in the exact numeric range, read once from the host clock per layer; it is not a client timestamp. Policies comparing timestamps must use that numeric representation; string/date coercion is forbidden. principal.roles/principal.groups and other list-valued params are valid only as In RHS; other operators return ACL_EVALUATION_FAILED. Scalar In RHS is a type error. No filesystem/env/network expressions. The MVP cross-layer fixture uses no time-dependent expressions. Query parameters have a distinct untrusted namespace and cannot override these variables.
+
+## Within-policy evaluation algorithm
+
+1. Resolve the verified subject in the owner realm. `users` matches only kind `user`; service/application/agent subjects match only explicitly assigned roles/groups or `everyone`. `currentUser` is the stable ID for human users only; use with another kind is an unresolved-variable error. Select `everyone` and matching user/role/group rule sets; union and deduplicate them. No match leaves a default-deny policy. Prefix rule IDs by rule-set ID and sort deterministically; declaration/map order is not authority.
+2. Select rules matching operation and structural resource. Sort descending path depth, descending literal specificity, restrictive effect first, then ascending qualified rule ID.
+3. Unconditional rules decide the remaining space. Conditional allow rules ahead of that terminal authorize only rows meeting their predicates. A deeper allow may reopen a less-specific deny; an equally specific deny precedes allow.
+4. For read row eligibility, conditional alternatives are ORed, bounded by the first unconditional rule. An unconditional allow makes row eligibility unrestricted, though field restrictions remain. Query field bounds conservatively intersect all possible deciding allow alternatives in the current DALgo profile.
+5. For an existing-row write choose the first alternative whose pre-image `where` is true, otherwise terminal allow; do not fall through to a later allow after that chosen rule's field or post-image check fails. For a new row choose the first alternative whose effective check succeeds, then check fields. `check` defaults to `where`. No admitting alternative means deny.
+6. Intersect independently applied policies. Conjoin their row obligations and intersect their field sets. A denial in one policy is never reopened by another.
+
+Policy IDs and rule IDs affect stable attribution; rule ID also currently breaks equivalent-priority ties. The editor must warn that renaming a rule can change precedence. MVP does not add policy renaming or arbitrary rule-order controls. Migration tests must prove equal decisions for legacy supported constructs, including this tie behavior.
+
+## Provenance and round-trip editing
+
+Policy visibility is owner-enforced classification. `private` hides policy identity, text, rules, predicates and policy-specific references from every caller except an explicitly authorized **policy admin at that owner**. Discovery/read/Explain/diagnostics privileges alone cannot reveal a private policy. `public` merely permits ordinary owner authorization checks to disclose it; it is not public unauthenticated access. Create/import defaults public. PUT omission preserves the stored visibility; canonical serialization always emits the effective visibility explicitly. A non-admin cannot change classification by omitting it. Changing this classification requires owner policy-admin authority, independently of ordinary edit permission. The owner persists and attests the effective classification and rejects a non-admin replacement that changes it. Legacy imports default public. Private restrictions may still return opaque request-scoped restriction IDs/generic denial without revealing hidden policy count or identity. These IDs cannot be dereferenced by non-admins. Classification applies to cached responses and audit access as well as policy download.
+
+Source, owner, layer, resource mount, Git revision and editability are returned in an **owner-attested envelope**, not trusted from user-editable text. `metadata.name` identifies the policy locally; global identity is `(ownerId, databaseId, policyId)`. A fetched descriptor includes the revision/ETag and source reference. Export may bundle that envelope beside the document, but import must discard claimed authority and obtain provenance from the new owner.
+
+MVP promises semantic round-trip and canonical idempotence: parse → document AST → edit → validate → serialize → parse preserves all supported fields/meaning; a second canonical serialization is byte-identical. It does not preserve comments, original whitespace, quoting, anchors or source ordering. Reject anchors/aliases, duplicate keys, merge keys, custom tags, multiple YAML documents and duplicate JSON object keys. This is stronger than assuming generic decoder unknown-field rejection suffices. Normalize map keys lexically, operation arrays to leaf order, subject/rule-set references as sorted sets; keep semantic scope/rule structures and qualified IDs intact. The UI explains that saving canonicalizes formatting. Raw text editing is optional, but parse/serialize APIs support it.
+
+Unknown-version, custom or nonportable policy documents remain represented by read-only descriptors. Never edit through a reduced AST and drop unsupported fields. A supported document with complex scope/pattern structure outside the form editor's fidelity can likewise be read-only or edited through the optional raw editor. Legacy conversion is an explicit owner-admin action with before/after differential fixtures; do not strip `target`/`composition` and call that a complete migration.
+
+## Execution routes and scoped masks
+
+C7 optional execution is a conjunctive gate in the same AccessPolicy/evaluator. Omission adds no route restriction; a present allow array defaults to deny for unlisted classes. Entries are class:dtql|native_sql|native_graphql|stored_procedure; procedure entries also require exact canonical namespace and a staged mask as defined in [19](19-scoped-mask-stages.md). Reject duplicate class/namespace entries. Ordinary action/resource policy checks still apply, and different mandatory policies intersect.
+
+```yaml
+execution:
+  allow:
+    - class: dtql
+    - class: stored_procedure
+      namespace: public
+      mask:
+        stages:
+          - include: ["User_*"]
+          - exclude: ["User_Delete*"]
+          - include: ["User_DeleteDraft"]
+```
+
+This admits only the scoped callable subset at this gate. Native SQL/GraphQL are unlisted and denied. For every procedure except sys_*, use include:["*"] then exclude:["sys_*"]. A deeper include can restore part of that exclusion, never a lower-owner denial. collectionMask and allow-rule fieldMask use the same stage form, with fieldPattern applying to nested field paths.
+
+executionClass is required in normalized operations; server derives it from the actual route/parsed operation and rejects a conflicting caller label. Calls hidden in SQL/functions/GraphQL cannot bypass procedure restrictions through a native label. The protected MVP permits real DTQL route gating and pure procedure-mask assessment only. All native/procedure effects execution remains unsupported even after a matching mask; no native parser/effects analyzer is added here. Existing DTQL action/table/row/column checks remain mandatory.
+
+===== 15-contract-completion.md =====
+# A2 contract completion
+
+Normative completion of C1–C6 following approved H1–H7. JSON shapes are in [contracts](contracts/README.md). These are specification artifacts, not executable ACL implementation. When interpreting A1 sketches, use the exact A2 definitions here; the frozen A1 review bundle remains historical evidence.
+
+## C4 evidence and transaction boundary
+
+Use `access/contract` for protocol DTOs/converters and keep `dal` independent of them. `access` owns internal assessment/evidence types; `access/contract` imports access, never the reverse. Existing `dtql` remains the query parser. Hosts implement provider/identity/storage interfaces; no new evaluator per host.
+
+The following signatures define the implementation seam; named values below are closed internal records, not browser DTOs:
+
+```go
+// Proposed API, not added to a Go package in this phase.
+type InspectionSession interface {
+    Assess(ctx context.Context) (Assessment, error)
+}
+type ExecutionSession interface {
+    InspectionSession
+    Execute(ctx context.Context) (ExecutionResult, error)
+}
+type EnforcementCoordinator interface {
+    WithinInspection(ctx context.Context, admission InspectionAdmission,
+        inspect func(InspectionSession) error) error
+    WithinExecution(ctx context.Context, admission ExecutionAdmission,
+        execute func(ExecutionSession) error) error
+}
+```
+
+`AssessmentPlan` contains normalized operations, immutable owner PolicySnapshots, verified principal snapshot and required evidence paths derived by the shared evaluator. It is constructed internally, never deserialized from HTTP. Both session implementations are unexported concrete, lifetime-checked capabilities supplied only to registered trusted wrappers through the coordinator. A callback cannot retain/use it after return. It exposes decisions/execute, **not** raw Get or a raw database handle. The coordinator privately provides complete pre-images and final candidate images to registered pure owner policy evaluators. Hosts register mandatory participants at mount construction, not per request. The callback may not remove participants. Trusted Go code is a process trust boundary, not a sandbox against malicious callbacks.
+
+The InGitDB adapter owns the coordinator and short storage transaction. Embedded OVDB registers its owner assessment through this seam; nested `SecureDB` must join the same operation token, not open an unrelated transaction or require public Get permission. The coordinator receives a privately constructed immutable admission containing verified principal, predeclared normalized operations and pinned participant registry. It constructs/binds the AssessmentPlan once; callbacks cannot substitute operations or a plan. The two entry methods bind inspection vs execution intent in their types. They acquire locks within the deadline, pin owner policy snapshots, capture one image/revision per unique target and construct candidate images. `Assess` evaluates without mutation; `Execute` performs current required assessments, revision checks and final-candidate checks before staging any mutation. It can run at most once, only through ExecutionSession; InspectionSession has no Execute method and its concrete type must not implement ExecutionSession. Closing commits only after one successful Execute and a successful callback, otherwise aborts. Inspection never starts a write executor. Existing legacy Policy interfaces stay unchanged. The lifecycle table below is normative.
+
+Private evidence record: `{canonicalTarget, snapshotToken, exists, preImage, candidateImage?, dataRevision?, complete:true}`. Absent record has exists=false and no image/revision; a present image includes every field, including explicit null. Schema transformations producing the final candidate must complete without external effects before evaluation. Missing capability, non-pure callback or unavailable final image is unsupported, not an empty image. No raw image crosses an HTTP boundary through this interface. Owner policy-admin authority alone does not grant evidence access.
+
+### Ingress/lifecycle compatibility
+
+| Ingress | Required lifecycle |
+|---|---|
+| plan | Pure metadata planner; never enters evidence coordinator, acquires data locks or reads images. |
+| inspect/sample row assessment | Privately constructed InspectionAdmission; read-only inspection session, one bounded snapshot per assessment. Sampling first selects authorized candidates and uses the same assessment path. |
+| concrete execution/single write | ExecutionAdmission with complete normalized operation; all mandatory registered wrappers join the same owner operation token and storage transaction, never recursively reacquire locks. |
+| declared batch | Complete unique-target operation list known before admission; one ExecutionSession, preflight all, Execute once, all-or-none. |
+| public dynamic RunReadwriteTransaction/RWTxWorker on ACL-enabled DTQL profile | Reject with ACL_ENFORCEMENT_UNSUPPORTED **before invoking the worker**, including workers with two writes, intervening reads or conditional operations. Do not execute a worker to discover its operation list. |
+| legacy ACL-disabled or existing legacy DALgo profile | Preserve existing callback semantics. The restriction applies only to the new negotiated protected profile. |
+
+The adapter's unexported coordinator can use the existing raw transaction implementation internally; it is never returned through the secured public handle. Protected single-operation helpers and HTTP declared batches use the coordinator directly instead of routing through the rejected public dynamic callback. Public read/session forwarding remains secured; unsupported alternate handles fail closed. Policy snapshots are fixed for each owner admission; nesting joins the already bound snapshot/plan. This is a documented narrow compatibility limit, not a design for general logical transactions.
+
+### Remote DataTug evidence
+
+Add an authorized point-inspection transport, `POST /v1/databases/{db}/access/evidence`, with body `{apiVersion,resource,requiredFields}`. Evidence resource forbids columns; requiredFields is its sole exact field-coverage list. Its response resource likewise forbids columns. It is an ordinary **data-read-authorized** operation, not an administrative escape hatch. Each owner authorizes Get and the requested concrete fields for the authenticated actor+subject. It rejects sampling, simulation and arbitrary owner predicates. Successful body: `{apiVersion,resource,exists:true,dataRevision,fields:[{path,state:"present",value}|{path,state:"absent"}]}`. For every requested field exactly one entry is required; duplicate/unrequested fields reject. An absent entry is an authoritative assertion of nonexistence in the same complete image, permitted only if the caller may read that field. A withheld field is never encoded as absent: the entire evidence request fails with safe authorization/unsupported result. The ordinary caller's missing and denied projection is identical (below). No response with exists=false is available in this MVP remote evidence shape.
+
+`dataRevision` is opaque, owner-issued, covering the entire record including hidden fields; all field evidence comes from that revision. DataTug requests the union of all dependencies needed to decide its possible winning rules, the mutation paths and any replacement/removal checks. Set requires complete readable pre-image coverage and is unsupported remotely if that cannot be proven, including an upsert requiring proof of absence. No exists=false evidence extension is implied. Candidate-only insert checks remain possible without a remote pre-image; lower insert existence/atomicity is still enforced by storage. No wildcard claim of completeness. The shared evaluator treats unspecified evidence as unknown, never absent or null. DataTug sends the same revision as ifDataRevision with the normalized mutation. Lower owner checks it under the transaction before mutation. Hidden-field-only concurrent changes invalidate it. No client-supplied projection hash or cached Explain result is authority.
+
+This extra endpoint is needed to distinguish redaction from absence; an ordinary projected Get response is insufficient. The driver may reuse a Get only if it exposes exactly this verified coverage/revision contract. Otherwise it must call evidence or fail closed. Evidence is held for one short request and never persisted in policy/UI caches.
+
+### Read constraint trust
+
+Keep caller field references separate from registered owner predicates in process. Owner predicates may use private fields only inside their owner evaluator. Across HTTP an upper-injected predicate is still an ordinary query constraint: lower field authorization applies. Do not accept a provenance label, signature or hiddenField=true as permission to query hidden fields. DataTug requests readable predicate dependencies internally, verifies returned rows against its pinned predicates before publishing the bounded response, then strips internal fields from the browser projection. All lower filters must already have applied before paging; verification failure aborts the response, never filters after paging. An adapter unable to execute these predicates faithfully before paging is unsupported. Sorting/limits and scalar semantics receive driver conformance tests, not an assumption that SQL or attestation makes them equivalent.
+
+## C2 result scope, sampling and disclosure
+
+`AuthorizationResult` requires `mode:plan|inspect|sample|execution` and `scope:request|sample`. Scope is sample iff mode is sample. Each operation result requires `id`, `requestOperationId`, action, concrete resource, result, restrictionIds and allOf. Outside sample id=requestOperationId. Sample accepts exactly one table operation template (get/exists/update/delete) and a query on that table; update requires candidate changes, delete requires empty mutation. The server assigns per-row IDs s1, s2, … in selection order, skipping any ID equal to the request template ID. It retains the mapping when composing lower results: remap all lower operation references into these IDs, never concatenate unrelated hop-local IDs. Row blockers/decisions reference the row ID; requestOperationId maps back to the template. Selection-level blockers, layer decisions, restrictions and unevaluated coverage instead reference the template ID, without creating an operationResult or incrementing evaluatedCount. The template domain represents pre-selection route/table/column denial and unavailable selection; it never implies a row exists. sample metadata includes templateOperationId and selectionResource (table path, no rowId); that diagnostic domain denotes the selection query action, while per-row operationResults denote the requested template action. This makes references intelligible without inventing a row. No per-row decision is returned for a key the requester cannot see. Incomplete selection-level work uses the template ID in `coverage.unevaluated`; IDs there may reference a request template or result operation and the consumer validates that union.
+
+Sample reducer: any definitive selection-level or sampled denial → deny; otherwise required missing evaluation/selection budget → indeterminate; otherwise conditional. A fully evaluated all-allow sample remains **conditional, allowed=false**, because it cannot authorize the general request. Per-row results may be allow. An empty completed sample is conditional with zero operations; sample metadata has evaluatedCount=0 and exhaustive=false. `coverage.evaluation:complete` refers to finishing the bounded sample, never exhausting the table. `sample.order` is an array of concrete field paths/directions ending in the canonical key; no free-text order string. RequestedLimit/evaluatedCount are counts of authorized candidates only. Sampling never broadens visibility using inspect-protected. A partial sample may return already safely evaluated rows with partial coverage; it never executes a write.
+
+Non-sample reduction: definitive denial dominates; then required failed/unevaluated participant gives indeterminate; then residual obligations conditional; otherwise allow. Errors are not converted to policy denials. `allowed=true` iff result=allow, coverage evaluation complete, no truncation, and scope=request. Hypothetical allow is an assessment only, never execution authority. Modes plan/inspect/execution do not have sample metadata. Every non-sample request ID occurs exactly once; synthetic IDs must not collide with template IDs when validating references. In plan, deferred row/post-image checks are explicit restrictions, not missing evidence: do not emit row_evidence_required. That coverage reason is reserved for modes that actually expected evidence.
+
+Each operation's `restrictionIds` and `allOf` have the same unique set; both reference all applicable mandatory restrictions. Keeping explicit allOf avoids interpreting them as alternatives. Disclosed expressions retain the policy's own OR semantics inside that conjunct. Restriction variants:
+
+- expression: kind row_filter or post_image_check, expression required, no fields/omissionReason;
+- fields: kind field_allowlist, fields required, no expression/omissionReason;
+- mask: kind field_mask, mask ordered stages required; no expression/fields/omissionReason (18);
+- reference: kind row_filter/post_image_check/field_allowlist/field_mask/opaque, omissionReason required (private/too_large/unsupported/not_authorized), no expression/fields.
+
+All variants require id, operationId, representation, kind, enforced; layerId/policyRef are optional under disclosure. `enforced=false` in every dry run, even after successful evaluation. In a successful execution it is true only when that obligation was applied at the actual query/write boundary. A denied execution has no obligation marked enforced merely because its evaluator ran. Internal enforcement completeness is separate from external disclosure: one opaque coalesced owner restriction may stand for several private restrictions. Never emit private cardinality, policy revisions, stable hidden IDs or separate per-policy placeholders to non-admins. Non-admin reference omissions use not_authorized, never private; private is only available to an owner policy admin already authorized to know that classification. All public identifiers/references are checked for referential integrity after redaction.
+
+`access:diagnostics` permits public policy references but no extra data visibility. Concrete protected-row existence/predicate facts require either ordinary authorized read visibility or an explicit owner `access:inspect-protected` grant for that key. The latter authorizes facts only; no image values, broad enumeration or private policy names. Policy admins need that separate grant to inspect unreadable data. Each owner independently projects its facts; upstream may only remove more detail.
+
+Ordinary point Get/HEAD/evidence/update/delete probes of a nonexistent or non-disclosable denied key return the same HTTP 404 `resource_unavailable` outer error and generic ACCESS_DENIED authorization projection, without row-specific facts. This public projection may replace an internal deny/not-found distinction; it never reports allow. Use the same projection for dry-run key probes in a 200 result, coalescing to generic deny. Invalid syntax/auth failures and static table/column denial independent of existence retain their usual status. Enhanced authorized inspection can report row-specific facts but still no raw values. Data revision conflicts are returned only after access and existence disclosure are authorized; otherwise use the safe projection, not a revision oracle.
+
+## C5 bounded execution and batches
+
+Reference profile limits: query default/max 1,000 returned rows, max offset 10,000, max 8 MiB buffered result, execution deadline 10 seconds from ingress; dry run deadline 2 seconds, sample N≤100. Earlier limits on requests, expressions and facts remain. Each hop propagates the remaining deadline, never resets it; lock acquisition consumes it. Adapter inability to enforce bounds fails before execution. Buffer overflow or query deadline produces no partial query success. Dry runs may return explicitly partial diagnostics. No background mutation continues after cancellation before commit. If a response is lost or cancellation arrives after the commit point, the outcome can be uncertain; do not promise safe automatic retry or introduce idempotency/transaction protocols here.
+
+A real batch is ≤100 operations with distinct IDs and **unique normalized record targets** across all operations, including differing path aliases resolving to the same owner key. Reject duplicates before evidence/mutation with 400 `duplicate_record_target`. Require one capable storage transaction and one owner database; cross-database/source batches are unsupported. Each item carries its own ifDataRevision when required. Capture/preflight all, check all revisions and final candidates, then apply all or none. A denied item collects other safely evaluable blockers and causes zero mutations. A revision conflict maps to that item in the non-ACL error detail and causes zero mutations. Dry-run multiple operations are independent snapshot assessments, never sequential hypothetical changes; they may mention a key more than once and cannot be submitted as a change-set authorization token.
+
+## C5 policy publication and process-crash recovery
+
+Filesystem owners (OVDB/DataTug): immutable generation directory with manifest, policy files, exact digest and enabled/realm configuration; write temporary generation, validate complete candidate, fsync files and directory, rename to immutable digest name, fsync parent. If that digest already exists, verify complete matching bytes and reuse it; do not overwrite an invalid existing generation or fail a valid no-op edit merely because the directory exists. Under cooperating owner publication lock/CAS, write and fsync temporary active manifest referencing that digest, atomically rename over active manifest, fsync directory; this rename is publication point. Publish in-memory snapshot before reopening admissions/responding success. Startup reads only the active manifest, validates referenced digest/files, and loads that complete generation. Incomplete/unreferenced generations are ignored, never inferred active. Crash before/after activation yields old/new complete generation. Filesystem adapters without these primitives are unsupported for editable stores. Missing active manifest on an enabled configured owner fails closed, never legacy mode.
+
+InGitDB additionally uses Git as the authoritative committed policy pointer. Require a clean policy/config tracked subtree at mount/edit; unrelated dirty data is not staged by policy CRUD. Under the existing cooperating repository writer lock, materialize and fsync the complete immutable generation, construct a Git tree from current HEAD changing only policy subtree/config, and create a commit using expected-parent compare-and-swap. Atomic HEAD update is the **policy commit point**. Do not use a partial working-tree manifest as active truth. After commit, refresh working active manifest to the committed pointer and publish the compiled snapshot before admission resumes/success response. Startup holds the cooperating lock while reading committed HEAD and verifying/materializing only its policy subtree and activating it. Read-only mounts may serve only if the committed generation can be validated without materialization using existing adapter capability; otherwise refuse the mount as unsupported, with no new committed-blob loader required; a crash before HEAD update keeps the old committed generation, after update recovers the new one even if working pointer/memory lagged. Never rewind HEAD to undo an already committed policy update. Returned commit failures before HEAD update preserve old state; failures afterwards are uncertain success and recover on restart. Git commit carries provenance; policy revision is the generation content digest, independent of unrelated data commits. Ref updates and generation writes require the existing lock; noncooperating filesystem/Git administrators remain outside the threat boundary.
+
+Process-crash tests kill between each numbered physical phase (generation write, fsync, rename, commit creation, HEAD CAS, working pointer, in-memory activation). Restart must serve old or new complete committed policy, never a mix or disabled ACL. Do not automatically repair arbitrary corrupted committed policy: fail closed and require owner repair. No distributed transaction, background recovery service or general data change-set protocol is introduced.
+
+### Revision domains and retention boundary
+
+Internal generationRevision covers the complete owner set/config and is never a public document ETag. Each policyRef.revision and policy CRUD ETag covers only that document's effective canonical bytes/identity; unchanged public policy retains its revision after a private-only edit. Under the owner lock, PUT compares the target document ETag, merges the replacement into the **current** set, validates that set and publishes a new internal generation. Concurrent private edits are preserved; a stale whole-set token is neither required from nor disclosed to the public editor. Non-admin responses always omit whole-set layer policyRevision, regardless of whether a private policy exists; internal attribution/redaction uses private generation tokens without leaking them. Admins may receive whole-set revision. Public caches use their visible documents' ETags; no hidden-state change feed is implied.
+
+Unreferenced generations remain inactive and may consume storage. Retention and cleanup are operator/follow-up work, not a new MVP GC subsystem or a condition for authorization correctness. Do not prune Git history as part of policy CRUD. Existing validated digest reuse prevents duplicate content writes; recovery never activates an unreferenced generation.
+
+## C6 schema and DDL
+
+Advertise `schema:read` as a separate owner capability. Field-filtered schema discovery intersects caller+subject visible field bounds at every owner and exposes only accessible collection/field names and safe scalar types. It does not expose hidden constraints, defaults, row counts or sensitive validation expressions. If a source cannot filter safely, return unsupported/generic metadata. Public policy text may intentionally reveal its public field selectors; schema filtering does not make public policy literals secret. Full schema metadata administration remains out of band. DDL is explicitly unsupported on ACL-enabled MVP data endpoints even for data/policy admins; setup provisions fixture schema before enabling ACL. This closes a bypass boundary without a new DDL policy language.
+
+===== 16-handoff.md =====
+# Corpus implementation handoff — gated, not dispatched
+
+Read [work packages](12-work-packages.md), [contract completion](15-contract-completion.md), [acceptance](11-acceptance.md) and [schemas](contracts/README.md) together. The user approved A1 suggestions, then requested this plan and another independent review. No package is authorized to begin MVP implementation until the resulting human checkpoint. Each package below is intended to become one independently reviewable worktree/PR, split a/b where dependency isolation is useful.
+
+## Contract ownership and gate sequence
+
+C1 policy + C2 wire + C3 identity + C4 evaluation/evidence + C5 revisions/publication + C6 query/write profile + C7 execution-route masks are versioned together in the DTQL packet. JSON Schema handles structural validation; semantic obligations are separately enumerated. Public Go DTOs live in DALgo `access/contract`; core assessment/evidence in `access`, no reverse import. TypeScript wire types are generated/checked from the same schema at implementation time, not hand-maintained parallel enums. Runtime validators still perform semantic checks. Runtime external-schema fetches are forbidden.
+
+G0: human accepts reviewed plan and frozen contract digest. G1: WP0 verified current baseline and WP1 schema/fixture distribution pass. G2: WP2 stable additive API and legacy differential tests pass; WP3 may then change enforcement internals. G3: direct InGitDB secured adapter passes private evidence/CAS/crash gates. G4: OpenVaultDB and driver pass transport/owner bypass tests. G5: DataTug daemon + UI pass integrated contract tests. G6: actual T01–T21 and V01–V08 pass; publish provider-first releases and owner docs. A prototype or unit-only pass cannot satisfy a later gate.
+
+A contract contradiction discovered during implementation stops only affected packages. Return a concrete failing vector and proposed contract patch to the design owner; do not silently fork behavior or weaken enforcement. Unaffected storage/UI work against fixed fixtures may continue. Unsupported reference capability is a release blocker, not an E2E skip. Additional nonreference adapters may remain explicitly unsupported.
+
+## Package cards
+
+| Package / size | Inputs and concrete outputs | Completion evidence / acceptance | Parallelism and risk |
+|---|---|---|---|
+| WP0 baseline / S | Audit exact current repos/modules/AGENTS; record dependency versions, Go commands and existing Nx targets; identify public constructors/server routes and minimum version matrix. No fleet-wide upgrades. | Baseline manifest and focused legacy test results; drift from audit-snapshots explained. Confirm no lower raw-handle path in planned changes. | First after G0. One coordinator owns version matrix; placeholder dtql-go/dalgo4auth need no implementation. |
+| WP1 contract distribution / M | Use A2 schemas/goldens, implement schema fixture validation/generation in DTQL existing tooling; distribute pinned fixture revision to Go/TS consumers. Add negative semantic corpus for rules/path/IDs/query mismatch/reference integrity and canonical YAML bytes. | Schema validation, canonical round-trip and semantic vectors checked; C1–C7 fields/taxonomy exhaustive. No runtime schema fetch. Valid/invalid fixtures do not conflate JSON Schema with semantic acceptance. | After WP0; unlocks WP2,4a,5a,7a. Do not redesign schemas per consumer. |
+| WP2a documents/DTO / M | `dalgo/access/document.go`, new `access/contract`; dual version decode, editable AST, canonical serializer, visibility-preserving replace normalization, execution gate/masks. Expose conversion without access→contract import. | T15/V02 + C7 parser/mask vectors; legacy bytes/meaning not silently rewritten; strict duplicate/tag/depth/unknown handling. | Same core owner as WP2b; can merge separately, no overlapping writers. |
+| WP2b principal/assessment / M–L | `access/{principal,policy,context}.go`; immutable typed verified subject/actor adapter, owner snapshots, structured assessments/blockers/obligations, stable source attribution, pure-policy adapter and bounded caches. | T04/T13/V01; existing qualified ordering/query-field intersection unchanged; policy iteration order does not affect final blockers. Existing singular API delegates compatibly. | After WP2a; pure assessment API review before WP3. Identity plumbing host interface tested with fake authoritative resolver, not invented login. |
+| WP3a secured reads / L | `access/{session,condition,fields}.go`, condeval and current end2end harness; move DataTug reference checks, preserve original refs, combine predicates before paging, bound buffer, validate returned evidence before projection. | T01/T10/V02/V08; query alternative fields intersection; hidden filter/sort rejects; no result emitted on adapter mismatch/overflow; route gate blocks before query. | After WP2b. Same branch/core owner as WP3b or serialize overlapping files. |
+| WP3b writes/inspection / L | `access/write.go` and additive coordinator/session interface in 15; pure plan/inspect/sample assessments, mandatory nested owner participation, complete private images/final candidate, normalized unique batch targets. | T07/T08/T16/V03/V04; recording adapter proves zero side effects in diagnostics/denial; session cannot escape lifetime; missing evidence distinct from null/absence; final transformations checked. | After WP2b; can develop adapter contract test double alongside WP4a, but G3 requires real storage. Highest security review priority. |
+| WP4a InGitDB policy store / M–L | `ingitdb-go/ingitdb/config/root_config.go` (nested module), `dalgo2ingitdb` loader/provider/store; immutable generation layout and committed-HEAD activation sequence. Management capability callback receives real caller. | T05/T14/V05: ETag CAS, whole-set validation, locked atomic HEAD update, exact process-crash recovery; old/new generation only. No policy subtree in data/schema enumeration. | After WP1, parallel core work. Commit plumbing reuses repository lock and stages only intended policy paths. Filesystem/Git administrator not adversary. |
+| WP4b InGitDB coordinator / L | Secured `NewDatabase`, transaction/reader forwarding, private evidence session and whole-record revisions under existing lock; all-or-none unique-target batch. Reuse stable DALgo G2 API plus completed WP3 enforcement API. | Direct adapter T03/T11/T16 + V03/V04/V08; hidden-field-only CAS conflict; public constructor cannot omit configured ACL, empty contexts no bypass. | After WP3+4a. Release nested config module before adapter if import requires it. |
+| WP5a OVDB control plane / M | `pkg/server`, auth token/grant store, owned filesystem policy store and source registry; C2 discover/CRUD/evaluate DTO transport and capability hints; persisted stable bootstrap subject; existing hosted identity ADR mapping. | HTTP fixture tests auth/subject/actor/admin/private visibility; PUT omission preserves private, 412/428; V05 filesystem crash recovery; no owner admin transitivity. | After WP1; scaffolding cannot claim enforcement. DataTug daemon store may later reuse safe helper if no undesirable product dependency; otherwise same fixture contract. |
+| WP5b OVDB secured execution / L | `pkg/{core,mount,server}`, all route audit; embed lower coordinator plus OVDB policy snapshots; C7 route classification from ingress; DDL rejection/filtered schema; safe redaction/errors; bounded diagnostics and evidence endpoint. | T03/T07/T09/T12/T17/T20 + V03/V06/V08. Native routes unsupported regardless of matching masks; no procedure execution as probe; owner tokens never bypass ACL. | After WP3/4b/5a. Transport owner is responsible for complete list of enabled routes, including HEAD/batch/schema. |
+| WP5c HTTP driver / M | `dalgo2openvaultdb`: typed result/errors, evidence coverage/revision, per-item mutation CAS, remaining deadlines, no buffered pre-read claim of atomicity; discovery/evaluate provider adapter. | Round-trip every C2 variant/reason; T11 race and V03 absent/null/withheld; ordinary missing/denied equal projection; no retries after uncertain commit. | After WP5a schemas; live tests after5b. Separate repo can parallelize with5b against frozen HTTP fixtures. |
+| WP6 DataTug daemon / L | `pkg/accesspolicies`, request context in query server, authenticated connection provider routes, own generation store; read path constraints and evidence endpoint usage; key record UPDATE independent of read-only builder. | T01–T08/T11–T13/T20 + V03/V05/V06. No CLI principal/no-policies bypass over HTTP, no raw DB fallback; upper deny still performs authorized lower inspect only. | After WP3/5b/5c. Existing local simulation remains visibly hypothetical. |
+| WP7a UI fixtures / M | DataTug Angular/Sneat workspace using discovered Nx targets; source/policy list, faithful AST form, CRUD ETags, read-only custom descriptors, route class and include/exclude form, Explain modes and structured states. | Component contract snapshots for allow/conditional/deny/indeterminate, public/private/admin, missing/opaque, stale revision and limits; visible “native execution unsupported” distinction. Accessibility keyboard/status checks. | After WP1, parallel backend. Browser never evaluates policy or holds owner tokens. |
+| WP7b UI live / M | Connect forms/Explain/query grid/record editor to authenticated daemon; show per-owner provenance and sample scope; canonical-save notice and reconnect/refresh behavior. | T05/T06/T18/T19/T20 live interactions; no all-record green allow from sample; a save error leaves editor state and previous effective policy intact. | After WP6/7a. No broad query-builder redesign or required raw text editor. |
+| WP8 vertical/security / L | Reuse DataTug E2E and InGitDB temporary-Git harness, start actual daemon/OVDB/browser, fixture membership/token provisioning, collect sanitized versioned evidence. | All T01–T21, V01–V08 and 13 mission proof links; actual query/UPDATE storage checks, three blockers with proper grants, direct bypass routes, reload/crash and CAS races. No mocked lower decisions. | Harness preparation can follow G1, final run after G5; one owner maintains deterministic fixture/reset. Failure requires focused repair/rerun, not repeated entire fleet. |
+| WP9 docs/releases / S–M | Owner README/spec/ADR correction list from audit; exact provider/consumer pins and compatibility profiles; publish schemas under approved namespace; migration note legacy disabled/enabled failclosed. | No stale docs claim row ACL absent or standalone InGitDB server; released modules reproduce G6; deployment demonstrates enabling all required owners without permissive intermediate mode. | Draft docs alongside implementation, publish after G6. Do not release each half-change blindly. |
+
+S/M/L are relative work sizes, not calendar commitments; largest uncertainty is coordinator integration, existing data commit semantics, driver revision support and frontend integration. WP0 must refine estimates using the actual current branch/API state. No hourly/model cost estimate is invented.
+
+## Start versus completion dependencies
+
+WP4a/WP5a/WP7a may start after WP1 with fixed JSON fixtures and storage/transport doubles. WP4a cannot merge as complete until WP2a's real strict decoder and WP2b provider/caller interfaces replace doubles and all store validation tests rerun. WP5a likewise completes only after WP2a DTOs and WP2b owner capability/provider interfaces integrate and its HTTP tests rerun with the real shared package. No copied decoder/DTO implementation may survive that gate. WP7a can complete UI fixtures after WP1, but live integration is exclusively WP7b. WP4b's G3 result depends on WP3, not on a circular preexisting G3 release. WP0 records exact module commits for these completion edges.
+
+## Exact ownership of semantic checks
+
+- DTQL spec fixture owner: syntax/closed schemas, code taxonomy, C7 masks, operation discriminator/action correspondence, sample reducers, ID reference integrity and canonicalization examples.
+- DALgo owner: hierarchy/bindings/predicates/fields, typed realm mapping adapter, class gates, required evidence, final candidate and multiple-policy assessments. Adapter conformance must use those functions.
+- Storage owner: complete evidence, revision token coverage, transaction lock/CAS/all-or-none, atomic generation publication and committed recovery, source-name normalization.
+- HTTP owner: authentication/delegation, capabilities and owner routing, disclosure, bounded body/deadlines and errors, no raw query/procedure fallback.
+- DataTug owner: own server enforcement, faithful display/edit/round-trip, stale/sampled/hypothetical states. Browser permissions are hints only.
+
+Each PR includes contract digest, prerequisite package commits/versions, touched surface, failure behavior, exact focused tests run, uncovered capabilities, and a link to its acceptance rows. A package is not done with only generated types or happy-path demos.
+
+## Release and dependency waves
+
+1. Publish reviewed DTQL specification artifact and DALgo additive APIs/validators with legacy tests; no downstream ACL enablement yet.
+2. Publish InGitDB config nested-module change, then secured dalgo2ingitdb; verify module graph, no permanent local replaces.
+3. Publish OVDB server/core and HTTP driver as a coordinated compatibility wave. Server advertises A2 capabilities; old servers fail protected client negotiation closed. Legacy ACL-disabled routes retain documented behavior.
+4. Pin DataTug daemon once to verified providers, then browser client contract support. Do not infer remote ACL support from product version alone.
+5. Run pinned full E2E and release owner docs/profile declaration. Enable ACL only after complete policies, identity mapping, manager and required capability verification; never deploy an empty enabled set or auto-disable on rollback.
+
+Rollback of a component to a version lacking the enabled profile must refuse the mount, not serve unrestricted. Policy generation rollback is an authorized new revision through the owner control plane, not a client option to use cached decisions. Operational deployment tooling is reused; no new orchestration service.
+
+The reviewed collection/column mask extension in 18 is part of C1/C2/C7 and these cards: WP1 final schema/goldens; WP2a existing fieldSet include/exclude compilation; WP2b collection gate; WP3 exclusions across references/projection/evidence/affected paths; WP4/5 filtered metadata; WP7 separate explicit-list versus mask authoring; WP8 mandatory T21 across all three owner/hop paths.
+
+A3 scoped-stage amendment (19): WP1/2 use variable-length ordered stages, same-action OR grouping and arbitrary-position segment globs; WP3 evaluates each concrete field under ancestor selections and retains conservative full-parent evidence checks; WP7 supplies ordered stage editing; WP8 extends T21 with the approved example, further alternation and cross-owner non-bypass. No separate mask service or native effects execution. Old flat-form examples are unreleased drafts and are migrated in fixtures, not supported as a second ambiguous wire format.
+
+===== 11-acceptance.md =====
+# Executable acceptance and E2E test plan
+
+These are implementation acceptance specifications, not tests already implemented or passed. Every test uses the frozen C1–C6 contracts; assertions compare structured codes/provenance, not English messages. Fixture setup uses isolated temporary directories and loopback services. No production databases or external identity service required.
+
+## Reference fixture
+
+Start the real DataTug daemon, OpenVaultDB HTTP server and local InGitDB adapter, with a real Git repository and persisted policy stores at all three owners. Drive the real browser policy workspace/query grid/record edit via the app's E2E runner. Record exact component SHAs/versions, policy revisions and test artifact hashes. Policy fixtures explicitly use `visibility:public` where non-admin reference diagnostics are asserted; privacy tests use private policies.
+
+Principals in realm `acl-e2e`: `user-alice` (role `crm-editor`, group `crm-team`, trusted `tenant=A`), `user-bob` (no editor binding), `policy-admin` (owner-scoped policy admin/CRUD grants), `policy-editor` (delegated CRUD only for selected public policies), actor `datatug-client` (delegated to Alice, read/update scope only). Also provision direct OpenVaultDB Alice token and direct InGitDB trusted principal context. Admin rights per owner are explicit. Diagnostic Alice has `access:diagnostics` for safe references at all owners and an owner-scoped `access:inspect-protected` grant for the concrete fixture keys (including 102); ordinary Alice omits both. Neither grant reveals private policies or raw row contents. No owner token in browser.
+
+Rows have fields `id,tenant,country,status,name,email,credit_limit`. ID is the record key and visible for authorized rows; update of ID is unsupported.
+
+| ID | tenant | country | status | name | email | credit_limit |
+|---|---|---|---|---|---|---|
+| 101 | A | IE | active | Ada | ada@example.test | 100 |
+| 102 | B | IE | active | Bea | bea@example.test | 200 |
+| 103 | A | US | active | Cal | cal@example.test | 300 |
+| 104 | A | IE | paused | Dee | dee@example.test | 400 |
+| 105 | A | IE | active | Eli | eli@example.test | 500 |
+
+Each layer has separate mandatory **row-access** and **field-access** policies. This is intentional reuse of DALgo intersection: unconditional field checks remain independently evaluable when a different row policy denies. Do not attempt to encode conditional `deny fields` rules.
+
+| Owner | Row policy: `get/exists/query/update` on `/customers` | Field policy read | Field policy update |
+|---|---|---|---|
+| InGitDB (`ingit-crm`) | `tenant-access`: allow where tenant == trusted tenant; check defaults where | All fixture fields | name,email,credit_limit,status |
+| OpenVaultDB (`ovdb-crm`) | `country-access`: allow where country == IE; check defaults where | All fixture fields | `financial-fields`: name,email,status |
+| DataTug (`datatug-crm`) | `workflow-access`: allow where status == active; check defaults where | All fixture fields | `workflow-fields`: name,email,credit_limit |
+
+All row policies use the bound `editor` rule set with user/role/group matches; selecting multiple matches deduplicates. Field policy read rules are unconditional, update field rules unconditional. No policy grants other data actions in the baseline; insert/set/delete tests temporarily add explicitly scoped rules. Add a read-only application `Policy` named `application-boundary`, public to the test principal, allowing only customer reads/update. It implements pure inspection, is mandatory and noneditable; no external service is needed.
+
+## Core end-to-end flow
+
+### T01 — Real query, conditions and concrete Explain
+
+Given baseline policies, when DataTug runs DTQL `from: {name: customers}` ordered by ID, then actual result IDs are exactly `[101,105]`. Record query execution at the storage boundary to prove tenant AND country AND status constraints apply before limit. Re-run with limit 1: `[101]`, not an empty page caused by post-page filtering.
+
+When plan dry run runs with no row IDs, then no adapter row read/query occurs, result is conditional with row admission restrictions for each owner, and safe expressions or private/too-large references. Inspect `get /customers/101` allows; inspect `get /customers/102` denies InGitDB; actual gets match at unchanged snapshots. A query filtering to 102 succeeds with zero visible rows; Explain `query` must not falsely claim a point-get allow or list hidden rows.
+
+### T02 — Real successful UPDATE
+
+Given authorized revision-bearing read of 101, when the browser changes `name` to `Ada Updated`, explains the same update and submits it, then Explain and execution allow, exactly that field changes, owner data revision changes, and one data Git commit records the mutation. All three row policies and field policies participate. Verify persisted file contents independently; an HTTP 200 alone is insufficient.
+
+### T03 — Independent enforcement and bypass attempts
+
+Given unchanged policies, when DataTug permits a lower-denied operation, then OpenVaultDB/InGitDB still deny. Direct OpenVaultDB updates of 102 fail at InGitDB; direct OpenVaultDB update `credit_limit` on 101 fails at OpenVaultDB. Direct InGitDB update of 102 fails at InGitDB. Direct OpenVaultDB change of `status` on 101 may succeed if its own/lower post-image constraints permit it: this correctly demonstrates DataTug policy scope, not a lower-policy bypass. Restore fixture after each branch. New `context.Background()` and transaction/reader handles cannot discard mandatory owner policies. An owner token has no data ACL override on an enabled mount.
+
+### T04 — Deterministic composition
+
+Given user/role/group all bind editor, then authority is not multiplied. Permute policy load order and subject membership order: same effective restrictions/blocker sets after canonical sorting. More-specific allow reopens same-policy parent deny; same-specificity deny wins; a separate policy deny remains final. New no-match principal Bob denies despite everyone/other unmatched permissions. Table no-match denies before data access.
+
+### T05 — Edit, persist, reconnect, rediscover, execute
+
+Given `policy-editor` can update the public OpenVaultDB financial-fields policy, when the UI adds credit_limit to its update allow-list using current ETag, saves, reconnects and restarts OpenVaultDB, then rediscovery returns the new persisted revision and AST. Explain update credit_limit on 101 now allows; actual UPDATE succeeds while status remains denied at DataTug. Restore policy, reconnect and verify denial returns. Create/delete an extra narrowing test policy through UI and verify behavior and revisions after reload. Unauthorized owner or stale ETag cannot mutate it; removing the last mandatory policy cannot disable ACL.
+
+### T06 — Read-only and custom policy representation
+
+Given application-boundary is visible and noneditable, then UI displays its source and contribution, with no save/delete controls. Direct CRUD API attempts fail. Make its pure evaluator deny in a controlled fixture: Explain and real operation both deny with application provenance. A nonserializable custom policy is not omitted or rewritten. Non-pure inspection is explicitly partial/unsupported.
+
+### T07 — Three blockers from one intended UPDATE
+
+Given diagnostic Alice requests update 102 setting credit_limit=10000 and status=vip, when DataTug runs inspect or handles the denied write, then return at least these three independent safe facts in one structured response:
+
+1. InGitDB tenant-access: `ACL_ROW_PREDICATE_FAILED`, row scope/where.
+2. OpenVaultDB financial-fields: `ACL_COLUMN_DENIED`, credit_limit.
+3. DataTug workflow-fields: `ACL_COLUMN_DENIED`, status.
+
+Each fact retains its exact owner/layer, policy revision and rule reference. Upper row predicates needing unavailable pre-image may be unevaluated, with explicit partial coverage; this does not remove the known three denials or fabricate additional predicate failures. No row values are disclosed. Data bytes and Git HEAD remain unchanged. Repeat with ordinary diagnostics: outcome still denies, hidden facts coalesce safely.
+
+### T08 — Dry run purity and bounded completeness
+
+Given instrumented storage/provider callbacks, plan makes zero data reads; inspect reads only supplied bounded keys; sample issues one bounded candidate selection plus bounded assessments; all perform zero mutation/trigger/Git commits. Upper static deny still requests lower safe evaluation. A required unavailable provider gives partial coverage and deny/indeterminate, never allow. Timeout/truncation is visible. Execution cannot use a dry-run response as permission. Malicious custom callbacks cannot execute through a purity-undeclared inspect path.
+
+## Security and contract cases
+
+| Test | Given / When | Required observable outcome |
+|---|---|---|
+| T09 Private policy disclosure | Private policy; reader/editor/Explain/diagnostics non-admin requests text, ID probe, conditions, blockers and sampling | Generic denial/opaque restriction only; no name, ID, text, predicate, hidden count, revision or existence oracle. Same owner policy admin can see it. OpenVaultDB admin cannot see private InGitDB policy without InGitDB admin grant. |
+| T10 Field inference | Query selects, filters, sorts, aliases or computes on a hidden field | Rejected before query; wildcard selection redacts; no filter/order leakage. Unsupported joins/functions/native SQL fail closed. |
+| T11 Changed state | Explain permits; change row/policy/membership before actual mutation | Actual current policy/membership denies, or data CAS conflicts; no write. Include hidden-field-only change to prove whole-row revision, not projected hash. |
+| T12 Request spoofing | Browser sets principal/roles/tenant or uses unrelated issuer token/client | Reject/ignore untrusted identity fields per contract, never grant. CORS/session and missing/expired token tests fail safely. |
+| T13 Actor and membership | Subject permits but actor scope denies; remove role/group after dry run; omit context | Capability/principal blocker; current resolver enforced; missing required identity fails closed. |
+| T14 Policy integrity | Concurrent edits, invalid candidate set, symlink/traversal, missing enabled manifest, failed Git commit | 412/validation error and prior state unchanged; no disabled fallback; restart preserves old or new complete set only. Non-admin cannot change private/public classification. |
+| T15 Parsing and limits | Round-trip supported documents and malformed/oversized/deep/duplicate YAML/JSON; unknown versions | Canonical idempotence and decision equality for valid inputs; bounded validation rejection for invalid. No dropped unknown fields. |
+| T16 Generic writes | Insert candidate wrong tenant; update moves tenant; set drops protected field; nested set changes sibling; multi-target one denied | Deny and no mutation; correct where/check/fields facts. Delete checks pre-image. No trigger/schema changes before final authorization. |
+| T17 Adapter capabilities | Non-DTQL SQLite behind OpenVaultDB; opaque native ACL source; adapter lacks revisions | OVDB policies enforced on SQLite smoke; opaque lower denial stays authoritative; conditional remote writes unsupported without atomic revision capability. |
+| T18 Top-N sample | Sample 1/2 visible candidates, no IDs; targeted update includes forbidden columns | Deterministic IDs/order, evaluated count ≤N, denied write columns included; no writes; sample-only flag. Zero sample conditional. No inference about hidden rows; target principal's broader read rights do not widen requester's visibility. |
+| T19 Condition size/privacy | No rows, one private predicate and one expression over disclosure limit | Opaque private/too_large references; result remains conditional; no weakened/silently cut predicate; private policy only visible to owner admin. |
+
+## Test layers and run evidence
+
+WP1 conformance vectors specify exact request/decision examples; WP2 unit/property/fuzz tests; WP4–6 real adapter/HTTP tests; WP7 UI interaction tests; WP8 full browser vertical flow. Reuse existing DALgo tests and InGitDB temporary-repo fixtures. Version-pin all Go/TS modules in an E2E manifest; CI artifacts include sanitized requests/responses, layer revision traces, Git before/after and browser failure screenshots. The explicit mission proof table below maps all 13 proofs; T20/T21 add execution and resource-mask coverage.
+
+Pass gate: all mandatory T01–T21 and V01–V08 checks at supported capabilities, no skipped reference InGitDB/UI cases, no credentials/row secrets in artifacts, and no forced best-effort adapter mode. Broader cloud/native sources may be explicitly out of profile, not silently skipped while claiming conformance.
+
+## A2 required regression vectors
+
+T20 — Execution classes/masks: a mandatory DTQL-only gate rejects native SQL/GraphQL and every procedure, including a SQL CALL disguised as native_sql. `public` include User_* admits names User_Create/User_ and denies Users_Create/sys_User; include * exclude sys_* rejects sys_read; include User_* exclude User_Delete rejects User_Delete even with a second matching include. Different namespace and canonical case remain distinct. Test mask round-trip, bounded matching and malformed masks. These are pure route decisions; actual protected native/procedure invocation remains unsupported and has zero effects, including a matching mask. A real DTQL query denied by an empty route allow-list executes no query; removing that narrowing policy restores the baseline. Each lower owner repeats route admission, so an upper allow cannot bypass a lower class denial.
+
+| Vector group | Exact additional assertions | Owner |
+|---|---|---|
+| V01 identity | Same ID user vs application/service/agent and realm A vs B cannot cross-match users; nonhuman currentUser indeterminate; explicit role binding works only after trusted realm resolution; stable bootstrap identity across restart | WP2/WP5 |
+| V02 predicates | Missing != null; null==null; missing never matches; `In` scalar membership; finite numeric comparisons with no string coercion; incompatible type error; UTF-8 ordering; exact integer boundary; captured path variable and nested fields | WP1/WP2/WP3 |
+| V03 evidence | Read-denied embedded row can be evaluated through registered private session with no public Get; retained/foreign session token rejects; redacted field is not absent; authorized absence and null differ; all evidence paths/revision same image | WP3/WP4/WP5/WP6 |
+| V04 batches | Duplicate normalized targets reject before reads/writes; different aliases of same key duplicate; per-item stale revision rolls back every item; deny in last item performs zero writes; two dry-run items are independent | WP3/WP4/WP5 |
+| V05 recovery | Process kill before/after each generation/HEAD/activation step; restart yields exactly committed old/new complete policy; no partial/no-policy admission; invalid committed generation fails closed | WP4a/WP5a/WP6 |
+| V06 disclosure | References-only and policy-admin-only cannot reveal unreadable-row existence; protected-key grant allows only facts for granted key; private metadata stays hidden; missing/denied ordinary HTTP and dry-run shapes equal; field evidence cannot declassify | WP5/WP6 |
+| V07 response | Sample operation IDs map to template; zero/all-allow samples conditional; partial sample indeterminate unless denial; every reference resolves; restriction variant fields exact; dry-run enforced=false; no private policy cardinality | WP1/WP5/WP7 |
+| V08 limits/schema | 1001 query rows, offset10001, >8MiB, elapsed10s or lockwait exhausted yields bounded failure/no partial success; schema hides unreadable fields; DDL rejects even for policy admin; no post-commit retry promise | WP3/WP4/WP5 |
+
+## Explicit mission proof map
+
+| # | Required proof | Test evidence |
+|---|---|---|
+| 1 | Every layer independently enforces | T03 direct owner/core paths |
+| 2 | Higher layer cannot bypass lower deny | T03, T20 |
+| 3 | Deterministic composition | T04 + V01/V02 |
+| 4 | DataTug discovers layers/provenance | T05/T06 |
+| 5 | Authorized policy editing | T05 real owner CRUD |
+| 6 | Noneditable policies represented | T06 custom pure provider |
+| 7 | Explain specific paths | T01 inspect + T07 |
+| 8 | Real query matches Explain | T01 with fixed revisions |
+| 9 | Real write matches Explain | T02 stored bytes/Git commit |
+| 10 | Multiple independent blockers | T07 one response |
+| 11 | Blockers retain owner/policy provenance | T07 enhanced grants + T09 redaction |
+| 12 | Bypass DataTug respects lower policies | T03 direct HTTP and adapter |
+| 13 | Edits persist after reload/reconnect | T05 + T14/V05 crash recovery |
+
+## Final review regression additions
+
+- Lifecycle: plan never enters evidence coordinator; inspection cannot acquire an execution session; retained/nested session token fails after lifetime; ACL-enabled dynamic transaction worker is rejected before any worker statement; legacy profile worker behavior remains unchanged.
+- Sample selection: field/route denial before rows emits a template-domain blocker, zero operations/count and deny; unavailable selection is indeterminate; template s1 allocates first row s2; lower IDs remap consistently.
+- Revisions: editing only a private policy leaves public policy ETag stable and never introduces a non-admin layer revision; concurrent public PUT preserves the private change.
+- Storage: identical valid generation is reused; invalid same-name generation rejects; no returned-error-only test substitutes for process kills.
+- Types/parsers: numeric Unix-millisecond now; list-valued parameter only In; strict query/sample aliases, tags, duplicate keys, depth/node/body bounds.
+- Field evidence: request/response resource.columns rejected, exact requiredFields covered; parent under possible child exclusion rejects both when child exists and when absent.
+
+T21's complete definition and owner matrix are in [18-mask-supplement.md](18-mask-supplement.md); it is a mandatory part of this acceptance plan.
+
+## A3 scoped-mask acceptance (T21 extension)
+
+At each owner/hop use include a*/b*, exclude *c*, include **d/a*f. Verify apple/abcd/acf/bdf admitted, bacon/zcd denied. A fourth exclude a* removes abcd/acf again only within the restored subset. Adjacent include a* then include b* is one OR-list, so banana remains admitted. A lower mandatory policy denying abcd remains decisive despite upper restoration. Persist/reload/canonicalize **d to *d without reordering stages. Enforce actual column read/write results, collection gates and pure callable assessment, never native execution.
+
+For nested field masks, retain projectable-versus-complete evidence checks even after restoration; a restored leaf may be readable while its parent remains unsupported as complete evidence. Test the same parent with hidden child present/absent. Over-budget stage/pattern input rejects before activation; a runtime mask budget failure is indeterminate (or overall deny when another definitive blocker exists), never an allow based on the evaluated prefix. Generate stage lists at advertised limit and limit+1 without embedding enormous fixtures in the spec repository.
+
+===== contracts/README.md =====
+# A2 machine-readable specification artifacts
+
+[acl.schema.json](acl.schema.json) is JSON Schema draft 2020-12. Select `$defs.policy`, request, result, policyWrite, policyEnvelope, policyPage, layersResponse, evidenceRequest/evidenceResponse, batchRequest/batchResult or error as an entry point. Every structured object is closed except deliberately open JSON data/attribute/binding maps. This is a specification, not a new executable parser/evaluator or deployed schema URL. Implementers generate/check DTOs against the pinned artifact, without runtime network fetching.
+
+[fixtures.json](fixtures.json) identifies complete valid/invalid structural examples. [semantic-vectors.json](semantic-vectors.json) contains declarative evaluator/validator cases; they specify expected behavior but are not claimed as passing runtime tests. [policy.canonical.yaml](policy.canonical.yaml) gives exact canonical text corresponding to policy.json. Canonical style: block maps/sequences, two-space map indent and indentless sequence entries, sorted map keys, LF terminators, final newline; quote ambiguous scalar values using YAML double quotes and escape control characters. No comments/anchors/tags; operation leaves use C1 order, semantic arrays retain order except defined sets. A serializer must match these bytes and idempotence fixtures; the style is not permission to coerce YAML scalars.
+
+Semantic validators MUST additionally enforce:
+
+1. UTF-8 **byte** bounds and numeric exact/finite range, recursion depth/node counts, ID regex, unique qualified rule IDs, existing rule-set references, strict duplicate keys/tags/aliases. JSON Schema maxLength counts characters, so alone is insufficient.
+2. Structural path normalization, alternating collection/key segments, target mount identity, percent decode once, field grammar, no duplicate/colliding requested field targets. Resource path/rowId/table/columns must agree with normalized parsed operations. A caller cannot name a trusted owner/realm by a path alias.
+3. DTQL query action requires query except plan-only static gate assessment; non-query forbids query. insert/set mutation is data, update mutation is changes, delete mutation is empty except revision. inspect requires a concrete key/candidate, not a query scan. plan may omit mutation and return residual post-image/field obligations; insert inspect supplies candidate data, not stored evidence. Query inspection uses sample, not a pretend exact point query.
+4. Only sample mode has sample metadata/request selection. Exactly one table template, supported get/exists/update/delete, no concrete rowId; update requires changes. Native classes only plan and no query/mutation payload; stored procedure requires callable, others forbid it. Server-derived class must agree with supplied class. Invocation names are resolved canonically, never assumed from caller claims.
+5. Every request operation ID unique. Non-sample results map exactly once to each request; sample per-row IDs map to its template and keys. Every blocker/layer/restriction reference resolves to a result operation or sample.templateOperationId (selection domain) in the post-redaction result; allOf=restrictionIds by set. Selection-level facts never increment evaluatedCount. Sample evaluatedCount equals distinct evaluated operation results, ≤requestedLimit; order ends in canonical key. Reducers and allowed equivalence in 15 apply across arrays, not just individual JSON fields.
+6. Layer IDs/source ownership anchored in registry; no client-provided policy authority. Private references/revisions/cardinality removed for non-admins; row facts separately authorized. Unknown **input** enum rejects; clients may display a generic error for unknown future returned codes. Consumers must not use a strict old decoder to accidentally turn a rejected future result into success.
+7. Evidence requiredFields and response fields match exactly once, no withheld-as-absent. Whole revision and image same snapshot; authorized existence only. A structural schema cannot prove evidence truth.
+8. Format/document pair matches: dtql-policy-json requires object, dtql-policy-yaml requires strict text. Owner normalizes missing visibility on PUT using stored value before validation/comparison; create/import defaults public. Canonical output always explicit visibility. capabilities are hints recomputed by owner, never write authority.
+9. Class gates and masks follow C7; absence leaves existing route semantics unchanged, present empty allow denies all; duplicate class/namespace entries reject; one scoped stage chain determines each mask. They do not replace policy action/resource checks or authorize unimplemented effects.
+
+HTTP policy create/replace bodies use policyWrite; success uses policyEnvelope with strong ETag. Policy list uses policyPage and bounded opaque cursor; default/max page size 100 and filtering before pagination. Layer discovery uses layersResponse. Unsupported/nonserializable custom policies use policyMetadata descriptors with serializable=false/editable=false, not a fake editable policyEnvelope. No untrusted descriptor reference is a fetch URL.
+
+Schema metadata read uses the host's existing schema response, filtered under schemaRead capability; it is not a new DTQL DDL transport. Existing execution endpoints normalize into C2 operations; their success data payloads remain host-owned, with C2 decision attachment where supported and typed C2 errors on denial. Existence/redaction overrides are in 15.
+
+A3 extensions: collectionMask and fieldMask contain ordered stages. Merge adjacent same-action stages, normalize repeated stars, sort/deduplicate patterns inside each merged stage, and preserve action-change order. nameMask supports anchored stars at any position within one segment; fieldPattern composes such segments with dots and preserves parent-prefix behavior. Legacy fields grammar remains unchanged. Leading/trailing whitespace rejects for new masks, while legacy fields behavior remains separate. field_mask restriction requires representation mask and mask object, or reference with omissionReason. Parent evidence under possible descendant exclusions is unsupported even if the child is absent; ordinary recursive projection is not complete evidence.
+
+Revision domains, mode-specific coordinator lifecycle, selection-level diagnostic IDs, and exact host-owned batch mapping are normative in 15/08. Query text strict decoding uses depth16/node4096/body1MiB limits; policy predicates retain their separate node limits. Mask and native execution policy representation never implies native effects capability.
+
+A3 [scoped stage semantics](../19-scoped-mask-stages.md) govern membership, canonicalization and operational bounds. scoped-mask-vectors.json is a declarative semantic corpus, not a shipped evaluator. A first exclude, empty stages, mixed action keys or the obsolete flat mask form rejects. Adjacent same-action stages are valid and canonically merged as one OR group before applying a type change.
+
+===== reviews/round-3/rubric.md =====
+# A3 identical independent delta-review rubric
+
+Review only this scoped-mask delta; the preceding A2/S1 architecture was independently reviewed/reconciled/correction-verified. User explicitly corrected flat exclude-wins masks to scoped include/exclude stages and confirmed **d means *d without recursive paths. This packet contains exact current relevant documents, compact JSON views of exact schema/fixtures, and the previously audited matcher excerpt. No runtime implementation is underway.
+
+Independently assess correctness/security, reuse of existing DALgo, interoperability/canonicalization, privacy/evidence, DataTug editing, work-package feasibility, test completeness and bounded MVP scope. Focus: adjacent same-action grouping, a later include confined to previous selected set, stage order, cross-policy intersection, nested field parent/descendant effects, legacy behavior, arbitrary-position globs, finite operational budgets with variable-length syntax, mask transport completeness. Do not reopen settled unrelated A2 choices or count existing explicit protections as missing.
+
+No external source/live-repo lookup, other review or file edits. Return concise report <=1800 words: verdict ready/ready-with-changes/not-ready, stable A3-/O3- IDs, severity critical/high/medium/low/future, exact evidence, concrete counterexample and recommended bounded action, whether freeze blocker. State limitations; no invented tests/telemetry. Both reviewers receive identical input, never peer findings. Separate reconciler de-duplicates, accepts/rejects/defers, flags true human decisions, evaluates unique value and actual exposed usage/cost; do not invent a third architecture. Original task forbids implementation before human sign-off.
+
+===== contracts/acl.schema.json (JSON compacted without changing values where applicable) =====
+{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"urn:dtql:acl:a2","title":"DTQL layered ACL final reviewed specification shapes","$defs":{"id":{"type":"string","minLength":1,"maxLength":128},"string":{"type":"string","minLength":1,"maxLength":256},"scalar":{"type":["string","boolean","number","null"]},"json":{},"field":{"type":"array","items":{"type":"string","minLength":1,"maxLength":256},"minItems":1,"maxItems":16},"condition":{"oneOf":[{"type":"object","properties":{"and":{"type":"array","items":{"$ref":"#/$defs/condition"},"minItems":1}},"required":["and"],"additionalProperties":false},{"type":"object","properties":{"or":{"type":"array","items":{"$ref":"#/$defs/condition"},"minItems":1}},"required":["or"],"additionalProperties":false},{"type":"object","properties":{"op":{"enum":["==",">",">=","<","<="]},"left":{"type":"object","properties":{"field":{"type":"string","minLength":1,"maxLength":256}},"required":["field"],"additionalProperties":false},"right":{"oneOf":[{"type":"object","properties":{"value":{"$ref":"#/$defs/scalar"}},"required":["value"],"additionalProperties":false},{"type":"object","properties":{"param":{"type":"string","minLength":1,"maxLength":256}},"required":["param"],"additionalProperties":false}]}},"required":["op","left","right"],"additionalProperties":false},{"type":"object","properties":{"op":{"const":"In"},"left":{"type":"object","properties":{"field":{"type":"string","minLength":1,"maxLength":256}},"required":["field"],"additionalProperties":false},"right":{"oneOf":[{"type":"object","properties":{"values":{"type":"array","items":{"$ref":"#/$defs/scalar"},"minItems":1}},"required":["values"],"additionalProperties":false},{"type":"object","properties":{"param":{"type":"string","minLength":1,"maxLength":256}},"required":["param"],"additionalProperties":false}]}},"required":["op","left","right"],"additionalProperties":false}]},"principal":{"type":"object","properties":{"realm":{"type":"string","minLength":1,"maxLength":256},"kind":{"enum":["user","service","application","agent"]},"id":{"type":"string","minLength":1,"maxLength":256}},"required":["realm","kind","id"],"additionalProperties":false},"resource":{"type":"object","properties":{"databaseId":{"type":"string","minLength":1,"maxLength":256},"path":{"type":"string","minLength":1,"maxLength":4096},"table":{"type":"string","minLength":1,"maxLength":256},"rowId":{"type":"string","minLength":1,"maxLength":256},"columns":{"type":"array","items":{"$ref":"#/$defs/field"},"minItems":0,"maxItems":32,"uniqueItems":true}},"required":["databaseId","path"],"additionalProperties":false},"action":{"enum":["get","exists","query","insert","set","update","delete","truncate"]},"rule":{"type":"object","properties":{"id":{"$ref":"#/$defs/id"},"effect":{"enum":["allow","deny"]},"operations":{"type":"array","items":{"enum":["get","exists","query","insert","set","update","delete","truncate","read","write","readwrite"]},"minItems":1,"maxItems":11,"uniqueItems":true},"where":{"$ref":"#/$defs/condition"},"check":{"$ref":"#/$defs/condition"},"fields":{"type":"array","items":{"type":"string","minLength":1,"maxLength":256},"minItems":1,"maxItems":32,"uniqueItems":true},"fieldMask":{"$ref":"#/$defs/fieldMask"}},"required":["id","effect","operations"],"additionalProperties":false,"allOf":[{"if":{"properties":{"effect":{"const":"deny"}}},"then":{"not":{"anyOf":[{"required":["where"]},{"required":["check"]},{"required":["fields"]}]}}},{"not":{"required":["fields","fieldMask"]}},{"if":{"properties":{"effect":{"const":"deny"}}},"then":{"not":{"required":["fieldMask"]}}}]},"scope":{"type":"object","properties":{"path":{"type":"string","minLength":1,"maxLength":4096},"collectionGroup":{"type":"string","minLength":1,"maxLength":256},"opaqueQuery":{"const":true},"rules":{"type":"array","items":{"$ref":"#/$defs/rule"},"minItems":1,"maxItems":1000},"scopes":{"type":"array","items":{"$ref":"#/$defs/scope"},"minItems":1}},"required":[],"additionalProperties":false,"oneOf":[{"required":["path"],"not":{"anyOf":[{"required":["collectionGroup"]},{"required":["opaqueQuery"]}]}},{"required":["collectionGroup"],"not":{"anyOf":[{"required":["path"]},{"required":["opaqueQuery"]}]}},{"required":["opaqueQuery"],"not":{"anyOf":[{"required":["path"]},{"required":["collectionGroup"]}]}}],"anyOf":[{"required":["rules"]},{"required":["scopes"]}]},"bindings":{"type":"object","properties":{"users":{"type":"object","minProperties":1,"additionalProperties":{"type":"array","items":{"$ref":"#/$defs/id"},"minItems":1,"maxItems":1000,"uniqueItems":true},"propertyNames":{"type":"string","minLength":1,"maxLength":256}},"roles":{"type":"object","minProperties":1,"additionalProperties":{"type":"array","items":{"$ref":"#/$defs/id"},"minItems":1,"maxItems":1000,"uniqueItems":true},"propertyNames":{"type":"string","minLength":1,"maxLength":256}},"groups":{"type":"object","minProperties":1,"additionalProperties":{"type":"array","items":{"$ref":"#/$defs/id"},"minItems":1,"maxItems":1000,"uniqueItems":true},"propertyNames":{"type":"string","minLength":1,"maxLength":256}},"everyone":{"type":"array","items":{"$ref":"#/$defs/id"},"minItems":1,"maxItems":1000,"uniqueItems":true}},"required":[],"additionalProperties":false,"minProperties":1},"policy":{"type":"object","properties":{"apiVersion":{"const":"dtql.org/access/v1"},"kind":{"const":"AccessPolicy"},"metadata":{"type":"object","properties":{"name":{"$ref":"#/$defs/id"},"description":{"type":"string","maxLength":2048},"visibility":{"enum":["public","private"]}},"required":["name"],"additionalProperties":false},"target":{"type":"object","properties":{"database":{"type":"string","minLength":1,"maxLength":256}},"required":["database"],"additionalProperties":false},"composition":{"const":"dalgo-hierarchical-v1"},"default":{"const":"deny"},"scopes":{"type":"array","items":{"$ref":"#/$defs/scope"},"minItems":1},"ruleSets":{"type":"object","minProperties":1,"propertyNames":{"$ref":"#/$defs/id"},"additionalProperties":{"type":"array","items":{"$ref":"#/$defs/scope"},"minItems":1}},"bindings":{"$ref":"#/$defs/bindings"},"execution":{"$ref":"#/$defs/executionGate"},"collectionMask":{"$ref":"#/$defs/collectionMask"}},"required":["apiVersion","kind","metadata","target","composition","default"],"additionalProperties":false,"oneOf":[{"required":["scopes"],"not":{"anyOf":[{"required":["ruleSets"]},{"required":["bindings"]}]}},{"required":["ruleSets","bindings"],"not":{"required":["scopes"]}}]},"query":{"type":"object","properties":{"format":{"const":"dtql-yaml"},"text":{"type":"string","minLength":1,"maxLength":1048576},"parameters":{"type":"object","additionalProperties":{"$ref":"#/$defs/scalar"}}},"required":["format","text"],"additionalProperties":false},"change":{"type":"object","properties":{"op":{"const":"set"},"path":{"$ref":"#/$defs/field"},"value":{"$ref":"#/$defs/json"}},"required":["op","path","value"],"additionalProperties":false},"mutation":{"oneOf":[{"type":"object","properties":{"data":{"type":"object"},"ifDataRevision":{"type":"string","minLength":1,"maxLength":256}},"required":["data"],"additionalProperties":false},{"type":"object","properties":{"changes":{"type":"array","items":{"$ref":"#/$defs/change"},"minItems":1,"maxItems":32},"ifDataRevision":{"type":"string","minLength":1,"maxLength":256}},"required":["changes"],"additionalProperties":false},{"type":"object","properties":{"ifDataRevision":{"type":"string","minLength":1,"maxLength":256}},"required":[],"additionalProperties":false}]},"operation":{"type":"object","properties":{"id":{"$ref":"#/$defs/id"},"action":{"$ref":"#/$defs/action"},"resource":{"$ref":"#/$defs/resource"},"query":{"$ref":"#/$defs/query"},"mutation":{"$ref":"#/$defs/mutation"},"executionClass":{"$ref":"#/$defs/executionClass"},"callable":{"$ref":"#/$defs/callable"}},"required":["id","action","resource","executionClass"],"additionalProperties":false,"allOf":[{"if":{"properties":{"executionClass":{"const":"stored_procedure"}}},"then":{"required":["callable"]},"else":{"not":{"required":["callable"]}}}]},"request":{"type":"object","properties":{"apiVersion":{"const":"dtql.org/authorization/v1"},"mode":{"enum":["plan","inspect","sample"]},"sample":{"type":"object","properties":{"query":{"$ref":"#/$defs/query"},"limit":{"type":"integer","minimum":1,"maximum":100}},"required":["query","limit"],"additionalProperties":false},"subject":{"$ref":"#/$defs/principal"},"simulation":{"type":"object","properties":{"roles":{"type":"array","items":{"type":"string","minLength":1,"maxLength":256},"minItems":0,"maxItems":1000,"uniqueItems":true},"groups":{"type":"array","items":{"type":"string","minLength":1,"maxLength":256},"minItems":0,"maxItems":1000,"uniqueItems":true},"attributes":{"type":"object","additionalProperties":{"$ref":"#/$defs/scalar"}}},"required":["roles","groups","attributes"],"additionalProperties":false},"operations":{"type":"array","items":{"$ref":"#/$defs/operation"},"minItems":1,"maxItems":100},"diagnosticLevel":{"enum":["ordinary","references","policy"]}},"required":["apiVersion","mode","operations","diagnosticLevel"],"additionalProperties":false,"allOf":[{"if":{"properties":{"mode":{"const":"sample"}}},"then":{"required":["sample"],"properties":{"operations":{"maxItems":1}}},"else":{"not":{"required":["sample"]}}}]},"policyRef":{"type":"object","properties":{"ownerId":{"type":"string","minLength":1,"maxLength":256},"databaseId":{"type":"string","minLength":1,"maxLength":256},"policyId":{"$ref":"#/$defs/id"},"revision":{"type":"string","minLength":1,"maxLength":256},"ruleId":{"type":"string","minLength":1,"maxLength":256}},"required":["ownerId","databaseId","policyId","revision"],"additionalProperties":false},"source":{"type":"object","properties":{"ownerId":{"type":"string","minLength":1,"maxLength":256},"provider":{"type":"string","minLength":1,"maxLength":256},"databaseId":{"type":"string","minLength":1,"maxLength":256},"kind":{"enum":["datatug","openvaultdb","ingitdb","application","adapter"]},"reference":{"type":"string","minLength":1,"maxLength":256}},"required":["ownerId","provider","databaseId","kind"],"additionalProperties":false},"outcome":{"enum":["allow","conditional","deny","indeterminate"]},"scopeName":{"enum":["database","table","row","column","operation","principal","configuration"]},"capabilities":{"type":"object","properties":{"discover":{"type":"boolean"},"list":{"type":"boolean"},"read":{"type":"boolean"},"create":{"type":"boolean"},"update":{"type":"boolean"},"delete":{"type":"boolean"},"explain":{"type":"boolean"},"simulate":{"type":"boolean"},"diagnostics":{"type":"boolean"},"policyAdmin":{"type":"boolean"},"inspectProtected":{"type":"boolean"},"schemaRead":{"type":"boolean"}},"required":["discover","list","read","create","update","delete","explain","simulate","diagnostics","policyAdmin","inspectProtected","schemaRead"],"additionalProperties":false},"limits":{"type":"object","properties":{"queryRows":{"type":"integer","minimum":1},"queryOffset":{"type":"integer","minimum":1},"bufferBytes":{"type":"integer","minimum":1},"executionMilliseconds":{"type":"integer","minimum":1},"dryRunMilliseconds":{"type":"integer","minimum":1},"sampleRows":{"type":"integer","minimum":1},"operations":{"type":"integer","minimum":1},"columns":{"type":"integer","minimum":1},"responseBytes":{"type":"integer","minimum":1},"maxMaskStages":{"type":"integer","minimum":1},"maxMaskPatterns":{"type":"integer","minimum":1},"maxMaskPatternBytes":{"type":"integer","minimum":1}},"required":["queryRows","queryOffset","bufferBytes","executionMilliseconds","dryRunMilliseconds","sampleRows","operations","columns","responseBytes","maxMaskStages","maxMaskPatterns","maxMaskPatternBytes"],"additionalProperties":false},"descriptor":{"type":"object","properties":{"layerId":{"type":"string","minLength":1,"maxLength":256},"source":{"$ref":"#/$defs/source"},"aclState":{"enum":["enabled","disabled","unavailable"]},"policyRevision":{"type":"string","minLength":1,"maxLength":256},"modes":{"type":"array","items":{"enum":["plan","inspect","sample"]},"minItems":0,"maxItems":3,"uniqueItems":true},"formats":{"type":"array","items":{"type":"string","minLength":1,"maxLength":256},"minItems":0,"maxItems":10,"uniqueItems":true},"capabilities":{"$ref":"#/$defs/capabilities"},"limits":{"$ref":"#/$defs/limits"},"required":{"type":"boolean"},"opaque":{"type":"boolean"},"enforcement":{"type":"object","properties":{"structuredQuery":{"type":"boolean"},"fieldReferences":{"type":"boolean"},"transactionalEvidence":{"type":"boolean"},"wholeRecordCAS":{"type":"boolean"},"remoteEvidence":{"type":"boolean"},"atomicBatch":{"type":"boolean"}},"required":["structuredQuery","fieldReferences","transactionalEvidence","wholeRecordCAS","remoteEvidence","atomicBatch"],"additionalProperties":false},"executionClasses":{"type":"array","items":{"$ref":"#/$defs/executionClass"},"minItems":0,"maxItems":4,"uniqueItems":true}},"required":["layerId","source","aclState","modes","formats","capabilities","limits","required","opaque","enforcement","executionClasses"],"additionalProperties":false},"operationResult":{"type":"object","properties":{"id":{"$ref":"#/$defs/id"},"requestOperationId":{"$ref":"#/$defs/id"},"action":{"$ref":"#/$defs/action"},"resource":{"$ref":"#/$defs/resource"},"result":{"$ref":"#/$defs/outcome"},"restrictionIds":{"type":"array","items":{"$ref":"#/$defs/id"},"minItems":0,"maxItems":1000,"uniqueItems":true},"allOf":{"type":"array","items":{"$ref":"#/$defs/id"},"minItems":0,"maxItems":1000,"uniqueItems":true},"executionClass":{"$ref":"#/$defs/executionClass"},"callable":{"$ref":"#/$defs/callable"}},"required":["id","requestOperationId","action","resource","result","restrictionIds","allOf","executionClass"],"additionalProperties":false,"allOf":[{"if":{"properties":{"executionClass":{"const":"stored_procedure"}}},"then":{"required":["callable"]},"else":{"not":{"required":["callable"]}}}]},"decision":{"type":"object","properties":{"operationId":{"$ref":"#/$defs/id"},"result":{"$ref":"#/$defs/outcome"},"policyRef":{"$ref":"#/$defs/policyRef"},"scope":{"$ref":"#/$defs/scopeName"},"ruleRefs":{"type":"array","items":{"type":"string","minLength":1,"maxLength":256},"minItems":0,"maxItems":1000,"uniqueItems":true},"bindingRefs":{"type":"array","items":{"type":"object","properties":{"kind":{"enum":["user","role","group","everyone"]},"id":{"type":"string","minLength":1,"maxLength":256}},"required":["kind","id"],"additionalProperties":false},"minItems":0,"maxItems":1000},"restrictionIds":{"type":"array","items":{"$ref":"#/$defs/id"},"minItems":0,"maxItems":1000,"uniqueItems":true}},"required":["operationId","result","scope","restrictionIds"],"additionalProperties":false},"layer":{"type":"object","properties":{"layerId":{"type":"string","minLength":1,"maxLength":256},"source":{"$ref":"#/$defs/source"},"aclState":{"enum":["enabled","disabled","unavailable"]},"result":{"$ref":"#/$defs/outcome"},"policyRevision":{"type":"string","minLength":1,"maxLength":256},"decisions":{"type":"array","items":{"$ref":"#/$defs/decision"},"minItems":0,"maxItems":1000}},"required":["layerId","source","aclState","result","decisions"],"additionalProperties":false},"blocker":{"type":"object","properties":{"operationId":{"$ref":"#/$defs/id"},"code":{"enum":["ACCESS_DENIED","ACL_RULE_DENIED","ACL_NO_MATCH","ACL_ROW_PREDICATE_FAILED","ACL_POST_IMAGE_FAILED","ACL_COLUMN_DENIED","ACL_EVALUATION_FAILED","ACL_CONFIGURATION_INVALID","ACL_SOURCE_UNAVAILABLE","ACL_ENFORCEMENT_UNSUPPORTED","ACL_PRINCIPAL_UNRESOLVED","ACL_CAPABILITY_DENIED","ACL_EXECUTION_CLASS_DENIED","ACL_CALLABLE_DENIED","ACL_COLLECTION_DENIED"]},"scope":{"$ref":"#/$defs/scopeName"},"resource":{"$ref":"#/$defs/resource"},"layerId":{"type":"string","minLength":1,"maxLength":256},"policyRef":{"$ref":"#/$defs/policyRef"},"slot":{"enum":["where","check","fields"]},"columns":{"type":"array","items":{"$ref":"#/$defs/field"},"minItems":1,"maxItems":32,"uniqueItems":true},"retryable":{"type":"boolean"},"executionClass":{"$ref":"#/$defs/executionClass"},"callable":{"$ref":"#/$defs/callable"}},"required":["operationId","code","scope"],"additionalProperties":false},"restriction":{"oneOf":[{"type":"object","properties":{"id":{"$ref":"#/$defs/id"},"operationId":{"$ref":"#/$defs/id"},"layerId":{"type":"string","minLength":1,"maxLength":256},"policyRef":{"$ref":"#/$defs/policyRef"},"enforced":{"type":"boolean"},"representation":{"const":"expression"},"kind":{"enum":["row_filter","post_image_check"]},"expression":{"$ref":"#/$defs/condition"}},"required":["id","operationId","enforced","representation","kind","expression"],"additionalProperties":false},{"type":"object","properties":{"id":{"$ref":"#/$defs/id"},"operationId":{"$ref":"#/$defs/id"},"layerId":{"type":"string","minLength":1,"maxLength":256},"policyRef":{"$ref":"#/$defs/policyRef"},"enforced":{"type":"boolean"},"representation":{"const":"fields"},"kind":{"const":"field_allowlist"},"fields":{"type":"array","items":{"type":"string","minLength":1,"maxLength":256},"minItems":1,"maxItems":32,"uniqueItems":true}},"required":["id","operationId","enforced","representation","kind","fields"],"additionalProperties":false},{"type":"object","properties":{"id":{"$ref":"#/$defs/id"},"operationId":{"$ref":"#/$defs/id"},"layerId":{"type":"string","minLength":1,"maxLength":256},"policyRef":{"$ref":"#/$defs/policyRef"},"enforced":{"type":"boolean"},"representation":{"const":"reference"},"kind":{"enum":["row_filter","post_image_check","field_allowlist","opaque","field_mask"]},"omissionReason":{"enum":["private","too_large","unsupported","not_authorized"]}},"required":["id","operationId","enforced","representation","kind","omissionReason"],"additionalProperties":false},{"type":"object","properties":{"id":{"$ref":"#/$defs/id"},"operationId":{"$ref":"#/$defs/id"},"layerId":{"type":"string","minLength":1,"maxLength":256},"policyRef":{"$ref":"#/$defs/policyRef"},"enforced":{"type":"boolean"},"representation":{"const":"mask"},"kind":{"const":"field_mask"},"mask":{"$ref":"#/$defs/fieldMask"}},"required":["id","operationId","enforced","representation","kind","mask"],"additionalProperties":false}]},"coverage":{"type":"object","properties":{"evaluation":{"enum":["complete","partial"]},"disclosure":{"enum":["full","redacted"]},"truncated":{"type":"boolean"},"unevaluated":{"type":"array","items":{"type":"object","properties":{"operationId":{"$ref":"#/$defs/id"},"layerId":{"type":"string","minLength":1,"maxLength":256},"reason":{"enum":["row_evidence_required","evidence_not_authorized","source_unavailable","unsupported","budget_exceeded"]}},"required":["operationId","reason"],"additionalProperties":false},"minItems":0,"maxItems":1000}},"required":["evaluation","disclosure","truncated","unevaluated"],"additionalProperties":false},"sampleResult":{"type":"object","properties":{"requestedLimit":{"type":"integer","minimum":1,"maximum":100},"evaluatedCount":{"type":"integer","minimum":0,"maximum":100},"selection":{"const":"readable_candidates"},"order":{"type":"array","items":{"type":"object","properties":{"field":{"$ref":"#/$defs/field"},"direction":{"enum":["asc","desc"]}},"required":["field","direction"],"additionalProperties":false},"minItems":1,"maxItems":32},"exhaustive":{"const":false},"templateOperationId":{"$ref":"#/$defs/id"},"selectionResource":{"$ref":"#/$defs/resource"}},"required":["requestedLimit","evaluatedCount","selection","order","exhaustive","templateOperationId","selectionResource"],"additionalProperties":false},"result":{"type":"object","properties":{"apiVersion":{"const":"dtql.org/authorization/v1"},"requestId":{"type":"string","minLength":1,"maxLength":256},"mode":{"enum":["plan","inspect","sample","execution"]},"scope":{"enum":["request","sample"]},"result":{"$ref":"#/$defs/outcome"},"allowed":{"type":"boolean"},"hypothetical":{"type":"boolean"},"operations":{"type":"array","items":{"$ref":"#/$defs/operationResult"},"minItems":0,"maxItems":100},"layers":{"type":"array","items":{"$ref":"#/$defs/layer"},"minItems":0,"maxItems":100},"blockers":{"type":"array","items":{"$ref":"#/$defs/blocker"},"minItems":0,"maxItems":1000},"coverage":{"$ref":"#/$defs/coverage"},"restrictions":{"type":"array","items":{"$ref":"#/$defs/restriction"},"minItems":0,"maxItems":1000},"sample":{"$ref":"#/$defs/sampleResult"}},"required":["apiVersion","requestId","mode","scope","result","allowed","hypothetical","operations","layers","blockers","coverage","restrictions"],"additionalProperties":false,"allOf":[{"if":{"properties":{"mode":{"const":"sample"}}},"then":{"required":["sample"],"properties":{"scope":{"const":"sample"},"allowed":{"const":false},"result":{"enum":["conditional","deny","indeterminate"]}}},"else":{"properties":{"scope":{"const":"request"}},"not":{"required":["sample"]}}},{"if":{"properties":{"allowed":{"const":true}}},"then":{"properties":{"result":{"const":"allow"},"coverage":{"properties":{"evaluation":{"const":"complete"},"truncated":{"const":false}}}}}},{"if":{"properties":{"mode":{"enum":["plan","inspect","sample"]}}},"then":{"properties":{"restrictions":{"items":{"properties":{"enforced":{"const":false}}}}}}},{"if":{"properties":{"result":{"const":"allow"},"scope":{"const":"request"},"coverage":{"properties":{"evaluation":{"const":"complete"},"truncated":{"const":false}}}}},"then":{"properties":{"allowed":{"const":true}}}}]},"policyMetadata":{"type":"object","properties":{"source":{"$ref":"#/$defs/source"},"policyRef":{"$ref":"#/$defs/policyRef"},"visibility":{"enum":["public","private"]},"editable":{"type":"boolean"},"serializable":{"type":"boolean"},"format":{"type":"string","minLength":1,"maxLength":256},"capabilities":{"$ref":"#/$defs/capabilities"}},"required":["source","policyRef","visibility","editable","serializable","capabilities"],"additionalProperties":false},"policyEnvelope":{"type":"object","properties":{"source":{"$ref":"#/$defs/source"},"policyRef":{"$ref":"#/$defs/policyRef"},"format":{"enum":["dtql-policy-json","dtql-policy-yaml"]},"document":{"oneOf":[{"$ref":"#/$defs/policy"},{"type":"string","minLength":1,"maxLength":1048576}]},"capabilities":{"$ref":"#/$defs/capabilities"}},"required":["source","policyRef","format","document","capabilities"],"additionalProperties":false},"policyWrite":{"type":"object","properties":{"format":{"enum":["dtql-policy-json","dtql-policy-yaml"]},"document":{"oneOf":[{"$ref":"#/$defs/policy"},{"type":"string","minLength":1,"maxLength":1048576}]}},"required":["format","document"],"additionalProperties":false},"policyPage":{"type":"object","properties":{"items":{"type":"array","items":{"$ref":"#/$defs/policyMetadata"},"minItems":0,"maxItems":100},"nextCursor":{"type":"string","minLength":1,"maxLength":4096}},"required":["items"],"additionalProperties":false},"layersResponse":{"type":"object","properties":{"items":{"type":"array","items":{"$ref":"#/$defs/descriptor"},"minItems":0,"maxItems":100}},"required":["items"],"additionalProperties":false},"evidenceRequest":{"type":"object","properties":{"apiVersion":{"const":"dtql.org/authorization/v1"},"resource":{"$ref":"#/$defs/evidenceResource"},"requiredFields":{"type":"array","items":{"$ref":"#/$defs/field"},"minItems":1,"maxItems":32,"uniqueItems":true}},"required":["apiVersion","resource","requiredFields"],"additionalProperties":false},"evidenceField":{"oneOf":[{"type":"object","properties":{"path":{"$ref":"#/$defs/field"},"state":{"const":"present"},"value":{"$ref":"#/$defs/json"}},"required":["path","state","value"],"additionalProperties":false},{"type":"object","properties":{"path":{"$ref":"#/$defs/field"},"state":{"const":"absent"}},"required":["path","state"],"additionalProperties":false}]},"evidenceResponse":{"type":"object","properties":{"apiVersion":{"const":"dtql.org/authorization/v1"},"resource":{"$ref":"#/$defs/evidenceResource"},"exists":{"const":true},"dataRevision":{"type":"string","minLength":1,"maxLength":256},"fields":{"type":"array","items":{"$ref":"#/$defs/evidenceField"},"minItems":1,"maxItems":32}},"required":["apiVersion","resource","exists","dataRevision","fields"],"additionalProperties":false},"error":{"type":"object","properties":{"error":{"type":"object","properties":{"code":{"enum":["access_denied","authorization_unavailable","authorization_unsupported","resource_unavailable","policy_revision_conflict","data_revision_conflict","duplicate_record_target","invalid_request","unauthenticated","precondition_required","resource_limit_exceeded"]},"requestId":{"type":"string","minLength":1,"maxLength":256},"authorization":{"$ref":"#/$defs/result"},"operationId":{"$ref":"#/$defs/id"}},"required":["code","requestId"],"additionalProperties":false}},"required":["error"],"additionalProperties":false},"executionClass":{"enum":["dtql","native_sql","native_graphql","stored_procedure"]},"callable":{"type":"object","properties":{"namespace":{"type":"string","minLength":1,"maxLength":128,"pattern":"^[^./\\\\\\x00-\\x1f*]+$"},"name":{"type":"string","minLength":1,"maxLength":128,"pattern":"^[^./\\\\\\x00-\\x1f*]+$"}},"required":["namespace","name"],"additionalProperties":false},"executionGate":{"type":"object","properties":{"allow":{"type":"array","items":{"oneOf":[{"type":"object","properties":{"class":{"enum":["dtql","native_sql","native_graphql"]}},"required":["class"],"additionalProperties":false},{"type":"object","properties":{"class":{"const":"stored_procedure"},"namespace":{"type":"string","minLength":1,"maxLength":128,"pattern":"^[^./\\\\\\x00-\\x1f*]+$"},"mask":{"$ref":"#/$defs/collectionMask"}},"required":["class","namespace","mask"],"additionalProperties":false}]},"minItems":0,"maxItems":32,"uniqueItems":true}},"required":["allow"],"additionalProperties":false},"nameMask":{"type":"string","minLength":1,"maxLength":128,"pattern":"^[^./\\\\\\x00-\\x20\\x7f?\\[\\]]+$"},"fieldPattern":{"type":"string","minLength":1,"maxLength":128},"collectionMask":{"type":"object","properties":{"stages":{"type":"array","minItems":1,"prefixItems":[{"type":"object","properties":{"include":{"type":"array","items":{"$ref":"#/$defs/nameMask"},"minItems":1}},"required":["include"],"additionalProperties":false}],"items":{"$ref":"#/$defs/nameStage"}}},"required":["stages"],"additionalProperties":false},"fieldMask":{"type":"object","properties":{"stages":{"type":"array","minItems":1,"prefixItems":[{"type":"object","properties":{"include":{"type":"array","items":{"$ref":"#/$defs/fieldPattern"},"minItems":1}},"required":["include"],"additionalProperties":false}],"items":{"$ref":"#/$defs/fieldStage"}}},"required":["stages"],"additionalProperties":false},"evidenceResource":{"type":"object","properties":{"databaseId":{"type":"string","minLength":1,"maxLength":256},"path":{"type":"string","minLength":1,"maxLength":4096},"table":{"type":"string","minLength":1,"maxLength":256},"rowId":{"type":"string","minLength":1,"maxLength":256}},"required":["databaseId","path"],"additionalProperties":false},"batchRequest":{"type":"object","properties":{"operations":{"type":"array","items":{"$ref":"#/$defs/operation"},"minItems":1,"maxItems":100}},"required":["operations"],"additionalProperties":false},"batchResult":{"type":"object","properties":{"items":{"type":"array","items":{"type":"object","properties":{"id":{"$ref":"#/$defs/id"},"dataRevision":{"$ref":"#/$defs/string"}},"required":["id"],"additionalProperties":false},"minItems":1,"maxItems":100},"authorization":{"$ref":"#/$defs/result"}},"required":["items","authorization"],"additionalProperties":false},"nameStage":{"oneOf":[{"type":"object","properties":{"include":{"type":"array","items":{"$ref":"#/$defs/nameMask"},"minItems":1}},"required":["include"],"additionalProperties":false},{"type":"object","properties":{"exclude":{"type":"array","items":{"$ref":"#/$defs/nameMask"},"minItems":1}},"required":["exclude"],"additionalProperties":false}]},"fieldStage":{"oneOf":[{"type":"object","properties":{"include":{"type":"array","items":{"$ref":"#/$defs/fieldPattern"},"minItems":1}},"required":["include"],"additionalProperties":false},{"type":"object","properties":{"exclude":{"type":"array","items":{"$ref":"#/$defs/fieldPattern"},"minItems":1}},"required":["exclude"],"additionalProperties":false}]}}}
+===== contracts/adjacent-include-stages.json (JSON compacted without changing values where applicable) =====
+{"stages":[{"include":["a*"]},{"include":["b*"]},{"exclude":["*c*"]}]}
+===== contracts/evidence-request.json (JSON compacted without changing values where applicable) =====
+{"apiVersion":"dtql.org/authorization/v1","resource":{"databaseId":"crm","path":"/customers/101","rowId":"101"},"requiredFields":[["name"],["middle_name"]]}
+===== contracts/evidence-response.json (JSON compacted without changing values where applicable) =====
+{"apiVersion":"dtql.org/authorization/v1","resource":{"databaseId":"crm","path":"/customers/101","rowId":"101"},"exists":true,"dataRevision":"whole-record-r7","fields":[{"path":["name"],"state":"present","value":"Ada"},{"path":["middle_name"],"state":"absent"}]}
+===== contracts/fixtures.json (JSON compacted without changing values where applicable) =====
+[{"file":"policy.json","definition":"policy","valid":true},{"file":"inspect-request.json","definition":"request","valid":true},{"file":"inspect-result.json","definition":"result","valid":true},{"file":"sample-result.json","definition":"result","valid":true},{"file":"opaque-plan-result.json","definition":"result","valid":true},{"file":"evidence-request.json","definition":"evidenceRequest","valid":true},{"file":"evidence-response.json","definition":"evidenceResponse","valid":true},{"file":"invalid-sample-allow.json","definition":"result","valid":false},{"file":"invalid-reference-expression.json","definition":"result","valid":false},{"file":"sample-selection-route-denied.json","definition":"result","valid":true},{"file":"sample-selection-field-denied.json","definition":"result","valid":true},{"file":"sample-selection-unavailable.json","definition":"result","valid":true},{"file":"sample-empty.json","definition":"result","valid":true},{"file":"sample-template-collision-avoided.json","definition":"result","valid":true},{"file":"sample-request-s1.json","definition":"request","valid":true},{"file":"mask-policy.json","definition":"policy","valid":true},{"file":"invalid-fields-and-mask.json","definition":"policy","valid":false},{"file":"valid-interior-mask.json","definition":"policy","valid":true},{"file":"mask-restriction-result.json","definition":"result","valid":true},{"file":"scoped-mask.json","definition":"collectionMask","valid":true},{"file":"adjacent-include-stages.json","definition":"collectionMask","valid":true},{"file":"invalid-first-exclude.json","definition":"collectionMask","valid":false},{"file":"invalid-empty-stages.json","definition":"collectionMask","valid":false},{"file":"invalid-mixed-stage.json","definition":"collectionMask","valid":false},{"file":"invalid-flat-mask.json","definition":"collectionMask","valid":false}]
+===== contracts/inspect-request.json (JSON compacted without changing values where applicable) =====
+{"apiVersion":"dtql.org/authorization/v1","mode":"inspect","diagnosticLevel":"ordinary","operations":[{"id":"u1","action":"update","resource":{"databaseId":"crm","path":"/customers/101","rowId":"101","columns":[["name"]]},"mutation":{"changes":[{"op":"set","path":["name"],"value":"Ada Updated"}]},"executionClass":"dtql"}]}
+===== contracts/inspect-result.json (JSON compacted without changing values where applicable) =====
+{"apiVersion":"dtql.org/authorization/v1","requestId":"req-1","mode":"inspect","scope":"request","result":"allow","allowed":true,"hypothetical":false,"operations":[{"id":"u1","requestOperationId":"u1","action":"update","resource":{"databaseId":"crm","path":"/customers/101","rowId":"101","columns":[["name"]]},"result":"allow","restrictionIds":[],"allOf":[],"executionClass":"dtql"}],"layers":[{"layerId":"ingit-crm","source":{"ownerId":"ingit-local","provider":"ingitdb","databaseId":"crm","kind":"ingitdb"},"aclState":"enabled","result":"allow","decisions":[{"operationId":"u1","result":"allow","scope":"operation","restrictionIds":[]}]}],"blockers":[],"coverage":{"evaluation":"complete","disclosure":"full","truncated":false,"unevaluated":[]},"restrictions":[]}
+===== contracts/invalid-empty-stages.json (JSON compacted without changing values where applicable) =====
+{"stages":[]}
+===== contracts/invalid-fields-and-mask.json (JSON compacted without changing values where applicable) =====
+{"apiVersion":"dtql.org/access/v1","kind":"AccessPolicy","metadata":{"name":"surface-masks","visibility":"public"},"target":{"database":"crm"},"composition":"dalgo-hierarchical-v1","default":"deny","collectionMask":{"stages":[{"include":["*"]},{"exclude":["sys_*"]}]},"execution":{"allow":[{"class":"dtql"},{"class":"stored_procedure","namespace":"public","mask":{"stages":[{"include":["User_*"]},{"exclude":["User_Delete"]}]}}]},"scopes":[{"path":"/","rules":[{"id":"surface","effect":"allow","operations":["get","exists","query","insert","set","update","delete"],"fieldMask":{"stages":[{"include":["*"]},{"exclude":["address.internal_*","secret_*"]}]},"fields":["name"]}]}]}
+===== contracts/invalid-first-exclude.json (JSON compacted without changing values where applicable) =====
+{"stages":[{"exclude":["sys_*"]}]}
+===== contracts/invalid-flat-mask.json (JSON compacted without changing values where applicable) =====
+{"include":["*"],"exclude":["sys_*"]}
+===== contracts/invalid-mixed-stage.json (JSON compacted without changing values where applicable) =====
+{"stages":[{"include":["*"],"exclude":["sys_*"]}]}
+===== contracts/invalid-reference-expression.json (JSON compacted without changing values where applicable) =====
+{"apiVersion":"dtql.org/authorization/v1","requestId":"req-1","mode":"plan","scope":"request","result":"conditional","allowed":false,"hypothetical":false,"operations":[{"id":"u1","requestOperationId":"u1","action":"update","resource":{"databaseId":"crm","path":"/customers/101","rowId":"101","columns":[["name"]]},"result":"conditional","restrictionIds":["r1"],"allOf":["r1"],"executionClass":"dtql"}],"layers":[{"layerId":"ingit-crm","source":{"ownerId":"ingit-local","provider":"ingitdb","databaseId":"crm","kind":"ingitdb"},"aclState":"enabled","result":"conditional","decisions":[{"operationId":"u1","result":"conditional","scope":"operation","restrictionIds":["r1"]}]}],"blockers":[],"coverage":{"evaluation":"complete","disclosure":"redacted","truncated":false,"unevaluated":[]},"restrictions":[{"id":"r1","operationId":"u1","kind":"row_filter","representation":"reference","omissionReason":"not_authorized","enforced":false,"layerId":"ingit-crm","expression":{"op":"==","left":{"field":"secret"},"right":{"value":"secret"}}}]}
+===== contracts/invalid-sample-allow.json (JSON compacted without changing values where applicable) =====
+{"apiVersion":"dtql.org/authorization/v1","requestId":"req-1","mode":"sample","scope":"sample","result":"conditional","allowed":true,"hypothetical":false,"operations":[{"id":"s1","requestOperationId":"template","action":"update","resource":{"databaseId":"crm","path":"/customers/101","rowId":"101","columns":[["name"]]},"result":"allow","restrictionIds":[],"allOf":[],"executionClass":"dtql"}],"layers":[{"layerId":"ingit-crm","source":{"ownerId":"ingit-local","provider":"ingitdb","databaseId":"crm","kind":"ingitdb"},"aclState":"enabled","result":"allow","decisions":[{"operationId":"s1","result":"allow","scope":"operation","restrictionIds":[]}]}],"blockers":[],"coverage":{"evaluation":"complete","disclosure":"full","truncated":false,"unevaluated":[]},"restrictions":[],"sample":{"requestedLimit":1,"evaluatedCount":1,"selection":"readable_candidates","order":[{"field":["id"],"direction":"asc"}],"exhaustive":false,"templateOperationId":"template","selectionResource":{"databaseId":"crm","path":"/customers"}}}
+===== contracts/mask-policy.canonical.yaml (JSON compacted without changing values where applicable) =====
+apiVersion: dtql.org/access/v1
+collectionMask:
+  stages:
+  - include:
+    - a*
+    - b*
+  - exclude:
+    - '*c*'
+  - include:
+    - '*d'
+    - a*f
+composition: dalgo-hierarchical-v1
+default: deny
+execution:
+  allow:
+  - class: dtql
+  - class: stored_procedure
+    mask:
+      stages:
+      - include:
+        - User_*
+      - exclude:
+        - User_Delete
+    namespace: public
+kind: AccessPolicy
+metadata:
+  name: surface-masks
+  visibility: public
+scopes:
+- path: /
+  rules:
+  - effect: allow
+    fieldMask:
+      stages:
+      - include:
+        - '*'
+      - exclude:
+        - address.internal_*
+        - secret_*
+    id: surface
+    operations:
+    - get
+    - exists
+    - query
+    - insert
+    - set
+    - update
+    - delete
+target:
+  database: crm
+
+===== contracts/mask-policy.json (JSON compacted without changing values where applicable) =====
+{"apiVersion":"dtql.org/access/v1","kind":"AccessPolicy","metadata":{"name":"surface-masks","visibility":"public"},"target":{"database":"crm"},"composition":"dalgo-hierarchical-v1","default":"deny","collectionMask":{"stages":[{"include":["a*","b*"]},{"exclude":["*c*"]},{"include":["*d","a*f"]}]},"execution":{"allow":[{"class":"dtql"},{"class":"stored_procedure","namespace":"public","mask":{"stages":[{"include":["User_*"]},{"exclude":["User_Delete"]}]}}]},"scopes":[{"path":"/","rules":[{"id":"surface","effect":"allow","operations":["get","exists","query","insert","set","update","delete"],"fieldMask":{"stages":[{"include":["*"]},{"exclude":["address.internal_*","secret_*"]}]}}]}]}
+===== contracts/mask-restriction-result.json (JSON compacted without changing values where applicable) =====
+{"apiVersion":"dtql.org/authorization/v1","requestId":"req-1","mode":"plan","scope":"request","result":"conditional","allowed":false,"hypothetical":false,"operations":[{"id":"u1","requestOperationId":"u1","action":"update","resource":{"databaseId":"crm","path":"/customers/101","rowId":"101","columns":[["name"]]},"result":"conditional","restrictionIds":["r1"],"allOf":["r1"],"executionClass":"dtql"}],"layers":[{"layerId":"ingit-crm","source":{"ownerId":"ingit-local","provider":"ingitdb","databaseId":"crm","kind":"ingitdb"},"aclState":"enabled","result":"conditional","decisions":[{"operationId":"u1","result":"conditional","scope":"operation","restrictionIds":["r1"]}]}],"blockers":[],"coverage":{"evaluation":"complete","disclosure":"redacted","truncated":false,"unevaluated":[]},"restrictions":[{"id":"r1","operationId":"u1","kind":"field_mask","representation":"mask","enforced":false,"layerId":"ingit-crm","mask":{"stages":[{"include":["*"]},{"exclude":["secret_*"]}]}}]}
+===== contracts/opaque-plan-result.json (JSON compacted without changing values where applicable) =====
+{"apiVersion":"dtql.org/authorization/v1","requestId":"req-1","mode":"plan","scope":"request","result":"conditional","allowed":false,"hypothetical":false,"operations":[{"id":"u1","requestOperationId":"u1","action":"update","resource":{"databaseId":"crm","path":"/customers/101","rowId":"101","columns":[["name"]]},"result":"conditional","restrictionIds":["r1"],"allOf":["r1"],"executionClass":"dtql"}],"layers":[{"layerId":"ingit-crm","source":{"ownerId":"ingit-local","provider":"ingitdb","databaseId":"crm","kind":"ingitdb"},"aclState":"enabled","result":"conditional","decisions":[{"operationId":"u1","result":"conditional","scope":"operation","restrictionIds":["r1"]}]}],"blockers":[],"coverage":{"evaluation":"complete","disclosure":"redacted","truncated":false,"unevaluated":[]},"restrictions":[{"id":"r1","operationId":"u1","kind":"row_filter","representation":"reference","omissionReason":"not_authorized","enforced":false,"layerId":"ingit-crm"}]}
+===== contracts/policy.canonical.yaml (JSON compacted without changing values where applicable) =====
+apiVersion: dtql.org/access/v1
+bindings:
+  groups:
+    crm-team:
+    - editor
+  roles:
+    crm-editor:
+    - editor
+  users:
+    user-alice:
+    - editor
+composition: dalgo-hierarchical-v1
+default: deny
+kind: AccessPolicy
+metadata:
+  name: tenant-access
+  visibility: public
+ruleSets:
+  editor:
+  - path: /customers
+    rules:
+    - effect: allow
+      fields:
+      - name
+      - email
+      id: update-tenant
+      operations:
+      - update
+      where:
+        left:
+          field: tenant
+        op: ==
+        right:
+          param: tenant
+target:
+  database: crm
+
+===== contracts/policy.json (JSON compacted without changing values where applicable) =====
+{"apiVersion":"dtql.org/access/v1","kind":"AccessPolicy","metadata":{"name":"tenant-access","visibility":"public"},"target":{"database":"crm"},"composition":"dalgo-hierarchical-v1","default":"deny","ruleSets":{"editor":[{"path":"/customers","rules":[{"id":"update-tenant","effect":"allow","operations":["update"],"where":{"op":"==","left":{"field":"tenant"},"right":{"param":"tenant"}},"fields":["name","email"]}]}]},"bindings":{"users":{"user-alice":["editor"]},"roles":{"crm-editor":["editor"]},"groups":{"crm-team":["editor"]}}}
+===== contracts/sample-empty.json (JSON compacted without changing values where applicable) =====
+{"apiVersion":"dtql.org/authorization/v1","requestId":"req-1","mode":"sample","scope":"sample","result":"conditional","allowed":false,"hypothetical":false,"operations":[],"layers":[{"layerId":"ingit-crm","source":{"ownerId":"ingit-local","provider":"ingitdb","databaseId":"crm","kind":"ingitdb"},"aclState":"enabled","result":"conditional","decisions":[]}],"blockers":[],"coverage":{"evaluation":"complete","disclosure":"full","truncated":false,"unevaluated":[]},"restrictions":[],"sample":{"requestedLimit":1,"evaluatedCount":0,"selection":"readable_candidates","order":[{"field":["id"],"direction":"asc"}],"exhaustive":false,"templateOperationId":"s1","selectionResource":{"databaseId":"crm","path":"/customers"}}}
+===== contracts/sample-request-s1.json (JSON compacted without changing values where applicable) =====
+{"apiVersion":"dtql.org/authorization/v1","mode":"sample","diagnosticLevel":"ordinary","sample":{"query":{"format":"dtql-yaml","text":"from:\n  name: customers\n"},"limit":1},"operations":[{"id":"s1","action":"update","executionClass":"dtql","resource":{"databaseId":"crm","path":"/customers"},"mutation":{"changes":[{"op":"set","path":["name"],"value":"New"}]}}]}
+===== contracts/sample-result.json (JSON compacted without changing values where applicable) =====
+{"apiVersion":"dtql.org/authorization/v1","requestId":"req-1","mode":"sample","scope":"sample","result":"conditional","allowed":false,"hypothetical":false,"operations":[{"id":"s1","requestOperationId":"template","action":"update","resource":{"databaseId":"crm","path":"/customers/101","rowId":"101","columns":[["name"]]},"result":"allow","restrictionIds":[],"allOf":[],"executionClass":"dtql"}],"layers":[{"layerId":"ingit-crm","source":{"ownerId":"ingit-local","provider":"ingitdb","databaseId":"crm","kind":"ingitdb"},"aclState":"enabled","result":"allow","decisions":[{"operationId":"s1","result":"allow","scope":"operation","restrictionIds":[]}]}],"blockers":[],"coverage":{"evaluation":"complete","disclosure":"full","truncated":false,"unevaluated":[]},"restrictions":[],"sample":{"requestedLimit":1,"evaluatedCount":1,"selection":"readable_candidates","order":[{"field":["id"],"direction":"asc"}],"exhaustive":false,"templateOperationId":"template","selectionResource":{"databaseId":"crm","path":"/customers"}}}
+===== contracts/sample-selection-field-denied.json (JSON compacted without changing values where applicable) =====
+{"apiVersion":"dtql.org/authorization/v1","requestId":"req-1","mode":"sample","scope":"sample","result":"deny","allowed":false,"hypothetical":false,"operations":[],"layers":[{"layerId":"ingit-crm","source":{"ownerId":"ingit-local","provider":"ingitdb","databaseId":"crm","kind":"ingitdb"},"aclState":"enabled","result":"deny","decisions":[{"operationId":"s1","result":"deny","scope":"operation","restrictionIds":[]}]}],"blockers":[{"operationId":"s1","code":"ACL_COLUMN_DENIED","scope":"column","executionClass":"dtql","layerId":"ingit-crm","columns":[["secret"]]}],"coverage":{"evaluation":"complete","disclosure":"full","truncated":false,"unevaluated":[]},"restrictions":[],"sample":{"requestedLimit":1,"evaluatedCount":0,"selection":"readable_candidates","order":[{"field":["id"],"direction":"asc"}],"exhaustive":false,"templateOperationId":"s1","selectionResource":{"databaseId":"crm","path":"/customers"}}}
+===== contracts/sample-selection-route-denied.json (JSON compacted without changing values where applicable) =====
+{"apiVersion":"dtql.org/authorization/v1","requestId":"req-1","mode":"sample","scope":"sample","result":"deny","allowed":false,"hypothetical":false,"operations":[],"layers":[{"layerId":"ingit-crm","source":{"ownerId":"ingit-local","provider":"ingitdb","databaseId":"crm","kind":"ingitdb"},"aclState":"enabled","result":"deny","decisions":[{"operationId":"s1","result":"deny","scope":"operation","restrictionIds":[]}]}],"blockers":[{"operationId":"s1","code":"ACL_EXECUTION_CLASS_DENIED","scope":"operation","executionClass":"dtql","layerId":"ingit-crm"}],"coverage":{"evaluation":"complete","disclosure":"full","truncated":false,"unevaluated":[]},"restrictions":[],"sample":{"requestedLimit":1,"evaluatedCount":0,"selection":"readable_candidates","order":[{"field":["id"],"direction":"asc"}],"exhaustive":false,"templateOperationId":"s1","selectionResource":{"databaseId":"crm","path":"/customers"}}}
+===== contracts/sample-selection-unavailable.json (JSON compacted without changing values where applicable) =====
+{"apiVersion":"dtql.org/authorization/v1","requestId":"req-1","mode":"sample","scope":"sample","result":"indeterminate","allowed":false,"hypothetical":false,"operations":[],"layers":[{"layerId":"ingit-crm","source":{"ownerId":"ingit-local","provider":"ingitdb","databaseId":"crm","kind":"ingitdb"},"aclState":"enabled","result":"indeterminate","decisions":[]}],"blockers":[],"coverage":{"evaluation":"partial","disclosure":"full","truncated":false,"unevaluated":[{"operationId":"s1","layerId":"ingit-crm","reason":"source_unavailable"}]},"restrictions":[],"sample":{"requestedLimit":1,"evaluatedCount":0,"selection":"readable_candidates","order":[{"field":["id"],"direction":"asc"}],"exhaustive":false,"templateOperationId":"s1","selectionResource":{"databaseId":"crm","path":"/customers"}}}
+===== contracts/sample-template-collision-avoided.json (JSON compacted without changing values where applicable) =====
+{"apiVersion":"dtql.org/authorization/v1","requestId":"req-1","mode":"sample","scope":"sample","result":"conditional","allowed":false,"hypothetical":false,"operations":[{"id":"s2","requestOperationId":"s1","action":"update","resource":{"databaseId":"crm","path":"/customers/101","rowId":"101","columns":[["name"]]},"result":"allow","restrictionIds":[],"allOf":[],"executionClass":"dtql"}],"layers":[{"layerId":"ingit-crm","source":{"ownerId":"ingit-local","provider":"ingitdb","databaseId":"crm","kind":"ingitdb"},"aclState":"enabled","result":"allow","decisions":[{"operationId":"s2","result":"allow","scope":"operation","restrictionIds":[]}]}],"blockers":[],"coverage":{"evaluation":"complete","disclosure":"full","truncated":false,"unevaluated":[]},"restrictions":[],"sample":{"requestedLimit":1,"evaluatedCount":1,"selection":"readable_candidates","order":[{"field":["id"],"direction":"asc"}],"exhaustive":false,"templateOperationId":"s1","selectionResource":{"databaseId":"crm","path":"/customers"}}}
+===== contracts/scoped-mask-vectors.json (JSON compacted without changing values where applicable) =====
+{"mask":{"stages":[{"include":["a*","b*"]},{"exclude":["*c*"]},{"include":["**d","a*f"]}]},"expectedMembership":{"apple":true,"bacon":false,"abcd":true,"acf":true,"bdf":true,"zcd":false},"canonicalMask":{"stages":[{"include":["a*","b*"]},{"exclude":["*c*"]},{"include":["*d","a*f"]}]},"additionalCases":[{"mask":{"stages":[{"include":["a*"]},{"include":["b*"]},{"exclude":["*c*"]}]},"name":"banana","expected":true},{"mask":{"stages":[{"include":["a*","b*"]},{"exclude":["*c*"]},{"include":["**d","a*f"]},{"exclude":["a*"]}]},"name":"abcd","expected":false},{"mask":{"stages":[{"include":["a*","b*"]},{"exclude":["*c*"]},{"include":["**d","a*f"]}]},"name":"zcd","anotherOwnerIncludes":["*"],"expectedEffective":false},{"mask":{"stages":[{"include":["a*","b*"]},{"exclude":["*c*"]},{"include":["**d","a*f"]}]},"name":"abcd","anotherOwnerExcludes":["abcd"],"expectedEffective":false}]}
+===== contracts/scoped-mask.json (JSON compacted without changing values where applicable) =====
+{"stages":[{"include":["a*","b*"]},{"exclude":["*c*"]},{"include":["**d","a*f"]}]}
+===== contracts/semantic-vectors.json (JSON compacted without changing values where applicable) =====
+[{"id":"identity-kind","policyUser":"same","ownerRealm":"r1","subject":{"realm":"r1","kind":"application","id":"same"},"expected":"no user binding"},{"id":"identity-realm","policyUser":"same","ownerRealm":"r1","subject":{"realm":"r2","kind":"user","id":"same"},"expected":"unresolved without trusted realm mapping"},{"id":"currentUser-service","parameter":"currentUser","subjectKind":"service","expected":"ACL_EVALUATION_FAILED"},{"id":"null-equals-null","condition":{"op":"==","left":{"field":"x"},"right":{"value":null}},"image":{"x":null},"expected":true},{"id":"missing-is-not-null","condition":{"op":"==","left":{"field":"x"},"right":{"value":null}},"image":{},"expected":false},{"id":"number-order","condition":{"op":">","left":{"field":"x"},"right":{"value":9}},"image":{"x":10},"expected":true},{"id":"no-string-coercion","condition":{"op":">","left":{"field":"x"},"right":{"value":9}},"image":{"x":"10"},"expected":"ACL_EVALUATION_FAILED"},{"id":"in","condition":{"op":"In","left":{"field":"x"},"right":{"values":["IE","US"]}},"image":{"x":"IE"},"expected":true},{"id":"string-order","condition":{"op":">","left":{"field":"x"},"right":{"value":"z"}},"image":{"x":"é"},"expected":true},{"id":"integer-overflow","value":9007199254740992,"expected":"validation rejected"},{"id":"capture","pathPattern":"/tenants/{tenantID}/customers","resource":"/tenants/A/customers/1","parameter":"path.tenantID","expected":"A"},{"id":"nested","condition":{"op":"==","left":{"field":"address.country"},"right":{"value":"IE"}},"image":{"address":{"country":"IE"}},"expected":true},{"id":"evidence-withheld","requiredFields":[["tenant"]],"responseFields":[],"expected":"unknown/unsupported, not absent"},{"id":"batch-repeated","targets":["/customers/101","/customers/%31%30%31"],"expected":"duplicate_record_target before reads or mutation"},{"id":"mask-include","include":["User_*"],"exclude":[],"name":"User_Create","expected":true},{"id":"mask-exclude","include":["*"],"exclude":["sys_*"],"name":"sys_read","expected":false},{"id":"two-stage-exclusion","include":["User_*","*"],"exclude":["User_Delete"],"name":"User_Delete","expected":false,"note":"Two stages only; later scoped includes may restore."},{"id":"mask-pass-unsupported","class":"stored_procedure","namespace":"public","name":"User_Create","gate":"allow","expected":"ACL_ENFORCEMENT_UNSUPPORTED; no invocation","mask":{"stages":[{"include":["User_*"]}]}},{"id":"sample-all-allow","perRowResults":["allow","allow"],"complete":true,"expected":{"result":"conditional","allowed":false}},{"id":"sample-empty","perRowResults":[],"complete":true,"expected":{"result":"conditional","allowed":false}},{"id":"sample-partial","perRowResults":["allow"],"complete":false,"expected":{"result":"indeterminate","allowed":false}},{"id":"sample-deny-partial","perRowResults":["deny"],"complete":false,"expected":{"result":"deny","allowed":false}},{"id":"parent-evidence-withheld-present","mask":{"stages":[{"include":["address.*"]},{"exclude":["address.internal_*"]}]},"requiredFields":[["address"]],"image":{"address":{"city":"Dublin","internal_code":"hidden"}},"expected":"parent evidence unsupported; no partial present object"},{"id":"parent-evidence-withheld-absent","mask":{"stages":[{"include":["address.*"]},{"exclude":["address.internal_*"]}]},"requiredFields":[["address"]],"image":{"address":{"city":"Dublin"}},"expected":"parent evidence unsupported; no excluded absence oracle"},{"id":"now-numeric","hostUnixMilliseconds":1700000000000,"parameter":"now","expected":1700000000000},{"id":"list-param-equality","op":"==","parameter":"principal.roles","value":["editor"],"expected":"ACL_EVALUATION_FAILED"},{"id":"new-mask-whitespace","include":[" User_*"],"expected":"validation rejected without trim"},{"id":"private-only-edit","publicDocumentUnchanged":true,"expected":"public policy ETag unchanged; non-admin layer revision always omitted"},{"id":"dynamic-worker","aclProfile":"dtql.org/access/v1","workerOperations":["update A","read B","update B"],"expected":"ACL_ENFORCEMENT_UNSUPPORTED before worker invocation"},{"id":"legacy-parent-pattern","patternsCompared":["address","address.*"],"expected":"equal inclusion decisions for parent and descendants"},{"id":"flat-dot-key","wireField":["a.b"],"policyFields":["a.b"],"expected":"normalization rejected; not nested a,b"},{"id":"nested-key","wireField":["a","b"],"policyFields":["a.b"],"expected":"matches nested path only"},{"id":"unsupported-selector-load","selector":{"collectionGroup":"customers"},"expected":"entire enabled candidate policy set invalid; never ignore scope"}]
+===== contracts/valid-interior-mask.json (JSON compacted without changing values where applicable) =====
+{"apiVersion":"dtql.org/access/v1","kind":"AccessPolicy","metadata":{"name":"surface-masks","visibility":"public"},"target":{"database":"crm"},"composition":"dalgo-hierarchical-v1","default":"deny","collectionMask":{"stages":[{"include":["*"]},{"exclude":["sys_*"]}]},"execution":{"allow":[{"class":"dtql"},{"class":"stored_procedure","namespace":"public","mask":{"stages":[{"include":["U*er_*"]},{"exclude":["User_Delete"]}]}}]},"scopes":[{"path":"/","rules":[{"id":"surface","effect":"allow","operations":["get","exists","query","insert","set","update","delete"],"fieldMask":{"stages":[{"include":["*"]},{"exclude":["address.internal_*","secret_*"]}]}}]}]}
+===== contracts/validation.json (JSON compacted without changing values where applicable) =====
+{"schemaValid":true,"structuralFixtures":[{"file":"policy.json","expectedValid":true,"matched":true},{"file":"inspect-request.json","expectedValid":true,"matched":true},{"file":"inspect-result.json","expectedValid":true,"matched":true},{"file":"sample-result.json","expectedValid":true,"matched":true},{"file":"opaque-plan-result.json","expectedValid":true,"matched":true},{"file":"evidence-request.json","expectedValid":true,"matched":true},{"file":"evidence-response.json","expectedValid":true,"matched":true},{"file":"invalid-sample-allow.json","expectedValid":false,"matched":true},{"file":"invalid-reference-expression.json","expectedValid":false,"matched":true},{"file":"sample-selection-route-denied.json","expectedValid":true,"matched":true},{"file":"sample-selection-field-denied.json","expectedValid":true,"matched":true},{"file":"sample-selection-unavailable.json","expectedValid":true,"matched":true},{"file":"sample-empty.json","expectedValid":true,"matched":true},{"file":"sample-template-collision-avoided.json","expectedValid":true,"matched":true},{"file":"sample-request-s1.json","expectedValid":true,"matched":true},{"file":"mask-policy.json","expectedValid":true,"matched":true},{"file":"invalid-fields-and-mask.json","expectedValid":false,"matched":true},{"file":"valid-interior-mask.json","expectedValid":true,"matched":true},{"file":"mask-restriction-result.json","expectedValid":true,"matched":true},{"file":"scoped-mask.json","expectedValid":true,"matched":true},{"file":"adjacent-include-stages.json","expectedValid":true,"matched":true},{"file":"invalid-first-exclude.json","expectedValid":false,"matched":true},{"file":"invalid-empty-stages.json","expectedValid":false,"matched":true},{"file":"invalid-mixed-stage.json","expectedValid":false,"matched":true},{"file":"invalid-flat-mask.json","expectedValid":false,"matched":true}],"yamlSemanticEquality":true,"runtimeACLTests":"not implemented; specification artifacts only"}
+===== AUDITED DALgo source 6b0be09b95bd3afc90309763671791e17264dffe =====
+
+
+```go
+1: package access
+2: 
+3: import (
+4: 	"context"
+5: 	"encoding/json"
+6: 	"fmt"
+7: 	"reflect"
+8: 	"sort"
+9: 	"strings"
+10: 
+11: 	"github.com/dal-go/dalgo/condeval"
+12: 	"github.com/dal-go/dalgo/dal"
+13: 	"github.com/dal-go/record"
+14: 	"github.com/dal-go/record/update"
+15: )
+16: 
+17: // fieldPattern is one parsed entry of a rule's fields allow-list: dotted
+18: // segments, each a literal, a lone "*" (any one segment) or a glob with one
+19: // "*" at the start or end ("public_*", "*_id"); a trailing ".*" matches the
+20: // whole subtree below the preceding path.
+21: type fieldPattern struct {
+22: 	source   string
+23: 	segments []string
+24: 	subtree  bool
+25: }
+26: 
+27: // fieldSet is a rule's allow-list. A nil *fieldSet means every field.
+28: type fieldSet struct {
+29: 	patterns []fieldPattern
+30: 	sources  []string
+31: }
+32: 
+33: func parseFieldPatterns(sources []string) (*fieldSet, error) {
+34: 	if len(sources) == 0 {
+35: 		return nil, fmt.Errorf("access: a fields list must name at least one pattern")
+36: 	}
+37: 	set := &fieldSet{}
+38: 	for _, source := range sources {
+39: 		text := strings.TrimSpace(source)
+40: 		if text == "" {
+41: 			return nil, fmt.Errorf("access: fields contains an empty pattern")
+42: 		}
+43: 		pattern := fieldPattern{source: text}
+44: 		if strings.HasSuffix(text, ".*") {
+45: 			pattern.subtree = true
+46: 			text = strings.TrimSuffix(text, ".*")
+47: 		}
+48: 		for _, segment := range strings.Split(text, ".") {
+49: 			if segment == "" {
+50: 				return nil, fmt.Errorf("access: fields pattern %q has an empty segment", source)
+51: 			}
+52: 			if stars := strings.Count(segment, "*"); stars > 1 || (stars == 1 && segment != "*" && !strings.HasPrefix(segment, "*") && !strings.HasSuffix(segment, "*")) {
+53: 				return nil, fmt.Errorf("access: fields pattern %q: a segment may be *, a prefix* or a *suffix", source)
+54: 			}
+55: 			pattern.segments = append(pattern.segments, segment)
+56: 		}
+57: 		set.patterns = append(set.patterns, pattern)
+58: 		set.sources = append(set.sources, pattern.source)
+59: 	}
+60: 	return set, nil
+61: }
+62: 
+63: func segmentMatches(pattern, segment string) bool {
+64: 	switch {
+65: 	case pattern == "*":
+66: 		return true
+67: 	case strings.HasPrefix(pattern, "*"):
+68: 		return strings.HasSuffix(segment, pattern[1:])
+69: 	case strings.HasSuffix(pattern, "*"):
+70: 		return strings.HasPrefix(segment, pattern[:len(pattern)-1])
+71: 	default:
+72: 		return pattern == segment
+73: 	}
+74: }
+75: 
+76: // allows reports whether a dotted field path is readable or writable under
+77: // the set: a pattern matches the path exactly, matches a prefix of it (an
+78: // allowed parent covers its children), or is a subtree pattern over a prefix.
+79: func (s *fieldSet) allows(path string) bool {
+80: 	if s == nil {
+81: 		return true
+82: 	}
+83: 	segments := strings.Split(path, ".")
+84: 	for _, pattern := range s.patterns {
+85: 		if len(pattern.segments) > len(segments) {
+86: 			continue
+87: 		}
+88: 		matched := true
+89: 		for i, want := range pattern.segments {
+90: 			if !segmentMatches(want, segments[i]) {
+91: 				matched = false
+92: 				break
+93: 			}
+94: 		}
+95: 		if matched {
+96: 			return true
+97: 		}
+98: 	}
+99: 	return false
+100: }
+101: 
+102: // enumerable reports the top-level field names the set can be projected to
+103: // when no pattern uses a wildcard in its first segment; otherwise ok is false
+104: // and callers must fall back to redaction.
+105: func (s *fieldSet) enumerable() (names []string, ok bool) {
+106: 	if s == nil {
+107: 		return nil, false
+108: 	}
+109: 	seen := map[string]struct{}{}
+110: 	for _, pattern := range s.patterns {
+111: 		first := pattern.segments[0]
+112: 		if strings.Contains(first, "*") {
+113: 			return nil, false
+114: 		}
+115: 		seen[first] = struct{}{}
+116: 	}
+117: 	names = make([]string, 0, len(seen))
+118: 	for name := range seen {
+119: 		names = append(names, name)
+120: 	}
+121: 	sort.Strings(names)
+122: 	return names, true
+123: }
+124: 
+125: // fieldSets is the intersection of the allow-lists every applicable policy
+126: // imposes on one resource; a field is allowed only when every set allows it.
+127: type fieldSets []*fieldSet
+128: 
+129: func (sets fieldSets) allows(path string) bool {
+130: 	for _, set := range sets {
+131: 		if !set.allows(path) {
+132: 			return false
+133: 		}
+134: 	}
+135: 	return true
+136: }
+137: 
+138: func (sets fieldSets) restrictive() bool {
+139: 	for _, set := range sets {
+140: 		if set != nil {
+141: 			return true
+142: 		}
+143: 	}
+144: 	return false
+145: }
+146: 
+147: func (sets fieldSets) sources() string {
+148: 	var all []string
+149: 	for _, set := range sets {
+150: 		if set != nil {
+151: 			all = append(all, "["+strings.Join(set.sources, ", ")+"]")
+152: 		}
+153: 	}
+154: 	return strings.Join(all, " ∩ ")
+155: }
+156: 
+157: // enumerable intersects the projectable top-level names of every set; ok is
+158: // false when any restrictive set cannot be enumerated.
+159: func (sets fieldSets) enumerable() ([]string, bool) {
+160: 	var names []string
+161: 	first := true
+162: 	for _, set := range sets {
+163: 		if set == nil {
+164: 			continue
+165: 		}
+166: 		own, ok := set.enumerable()
+167: 		if !ok {
+168: 			return nil, false
+169: 		}
+170: 		if first {
+171: 			names, first = own, false
+172: 			continue
+173: 		}
+174: 		keep := names[:0]
+175: 		for _, name := range names {
+176: 			for _, candidate := range own {
+177: 				if name == candidate {
+178: 					keep = append(keep, name)
+179: 					break
+180: 				}
+181: 			}
+182: 		}
+183: 		names = keep
+184: 	}
+185: 	return names, !first
+186: }
+187: 
+188: // disallowedPaths lists the leaf paths of JSON-shaped data the sets refuse.
+189: func (sets fieldSets) disallowedPaths(data map[string]any) []string {
+190: 	var refused []string
+191: 	var walk func(prefix string, value any)
+192: 	walk = func(prefix string, value any) {
+193: 		if nested, ok := value.(map[string]any); ok && len(nested) > 0 {
+194: 			for key, child := range nested {
+195: 				path := key
+196: 				if prefix != "" {
+197: 					path = prefix + "." + key
+198: 				}
+199: 				walk(path, child)
+200: 			}
+201: 			return
+202: 		}
+203: 		if !sets.allows(prefix) {
+204: 			refused = append(refused, prefix)
+205: 		}
+206: 	}
+207: 	for key, value := range data {
+208: 		walk(key, value)
+209: 	}
+210: 	sort.Strings(refused)
+211: 	return refused
+212: }
+213: 
+214: // disallowedUpdates lists the update paths the sets refuse.
+215: func (sets fieldSets) disallowedUpdates(updates []update.Update) []string {
+216: 	var refused []string
+217: 	for _, item := range updates {
+218: 		path := item.FieldName()
+219: 		if fieldPath := item.FieldPath(); len(fieldPath) > 0 {
+220: 			path = strings.Join(fieldPath, ".")
+221: 		}
+222: 		if !sets.allows(path) {
+223: 			refused = append(refused, path)
+224: 		}
+225: 	}
+226: 	sort.Strings(refused)
+227: 	return refused
+228: }
+229: 
+230: // redactMap removes every leaf the sets refuse, in place.
+231: func (sets fieldSets) redactMap(prefix string, data map[string]any) {
+232: 	for key, value := range data {
+233: 		path := key
+234: 		if prefix != "" {
+235: 			path = prefix + "." + key
+236: 		}
+237: 		if nested, ok := value.(map[string]any); ok && len(nested) > 0 {
+238: 			sets.redactMap(path, nested)
+239: 			if len(nested) == 0 {
+240: 				delete(data, key)
+```

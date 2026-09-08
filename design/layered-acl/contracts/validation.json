@@ -87,16 +87,77 @@
       "matched": true
     },
     {
-      "file": "invalid-interior-mask.json",
-      "expectedValid": false,
+      "file": "valid-interior-mask.json",
+      "expectedValid": true,
       "matched": true
     },
     {
       "file": "mask-restriction-result.json",
       "expectedValid": true,
       "matched": true
+    },
+    {
+      "file": "scoped-mask.json",
+      "expectedValid": true,
+      "matched": true
+    },
+    {
+      "file": "adjacent-include-stages.json",
+      "expectedValid": true,
+      "matched": true
+    },
+    {
+      "file": "invalid-first-exclude.json",
+      "expectedValid": false,
+      "matched": true
+    },
+    {
+      "file": "invalid-empty-stages.json",
+      "expectedValid": false,
+      "matched": true
+    },
+    {
+      "file": "invalid-mixed-stage.json",
+      "expectedValid": false,
+      "matched": true
+    },
+    {
+      "file": "invalid-flat-mask.json",
+      "expectedValid": false,
+      "matched": true
+    },
+    {
+      "file": "adjacent-exclude-stages.json",
+      "expectedValid": true,
+      "matched": true
+    },
+    {
+      "file": "adjacent-include-stages.canonical.json",
+      "expectedValid": true,
+      "matched": true
+    },
+    {
+      "file": "adjacent-exclude-stages.canonical.json",
+      "expectedValid": true,
+      "matched": true
+    },
+    {
+      "file": "three-stage-mask-result.json",
+      "expectedValid": true,
+      "matched": true
+    },
+    {
+      "file": "three-stage-procedure-policy.json",
+      "expectedValid": true,
+      "matched": true
     }
   ],
-  "yamlSemanticEquality": true,
-  "runtimeACLTests": "not implemented; specification artifacts only"
+  "canonicalYamlFixtures": [
+    "policy",
+    "mask-policy",
+    "adjacent-include-stages",
+    "adjacent-exclude-stages"
+  ],
+  "canonicalByteCheck": "Local YAML artifact harness uses prescribed double quoting; parse/dump idempotence verified. This is not DALgo serializer validation.",
+  "runtimeACLTests": "not implemented; semantic vectors and production serializer tests remain planned"
 }
