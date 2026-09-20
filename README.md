@@ -5,6 +5,10 @@ The [negative projection reference](reference/negative-projection.md) defines
 how a query selects all columns except an explicit list, including qualified
 source scope and missing-name behavior.
 
+The [aggregation reference](reference/aggregation.md) defines YAML-native
+grouping, aggregate expressions, HAVING, aliases, null/empty semantics, and the
+provider-independent execution contract.
+
 The [layered ACL MVP design packet](design/layered-acl/README.md) proposes portable policy and authorization contracts across DTQL, DALgo, InGitDB, OpenVaultDB and DataTug. It includes the current-state audit, implementation work packages and independent review material. Its implementation plan and contracts have independent review, reconciliation and correction verification, and await human dispatch approval; the MVP is not implemented by this packet.
 
 The [human checkpoint and review report](design/layered-acl/reviews/round-3/README.md) includes both independent reviews, separate reconciliation, resolved findings and measured review cost/value. The implementation plan was reviewed alongside the design; implementation dispatch awaits human sign-off.
