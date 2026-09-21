@@ -103,6 +103,10 @@ scan below local grouping.
 - `SUM`, `AVG`, `MIN`, and `MAX` ignore null; empty/all-null input returns null.
 - `SUM` and `AVG` use finite `float64` accumulation. Non-numeric dynamic values
   are outside their numeric domain and are ignored.
+- This numeric contract is approximate: integers above 2^53 can lose identity
+  when normalized, and `SUM`/`AVG` are not exact decimal money operations.
+  Do not use these aggregates for financial reconciliation requiring exact
+  cents or for grouping large integer identifiers.
 - Arithmetic normalizes numeric operands to `float64`; non-numeric operands and
   division by zero evaluate to null.
 - `MIN` and `MAX` preserve the normalized scalar value.
@@ -120,15 +124,21 @@ claim native parity when their semantics are incompatible.
 ## Planning and resource behavior
 
 DALgo first uses full native aggregation when every required capability is
-advertised. Otherwise it pushes safe row filtering, uses provider ordering by
-group keys for incremental streaming when available, and falls back to a typed
-hash map when it is not. Streaming retains one group's aggregate states. Hash
-execution retains one state set per group, never all source records.
+advertised. Otherwise it pushes safe row filtering, uses incremental streaming
+only when a provider guarantees that ordering keeps DALgo-normalized typed
+group keys contiguous, and falls back to a typed hash map when it cannot.
+Generic `ORDER BY` support alone does not establish that guarantee. Without
+requested result ordering, streaming retains one group's aggregate states.
+Requested result ordering materializes groups and their output for sorting;
+hash execution also retains one state set per group. Neither retains all source
+records.
 
 The current local safeguards cap groups and distinct values per aggregate at
 100,000, cap total aggregate states and total distinct values across a query at
-1,000,000 each, and cap retained group keys, distinct keys and JSON-encoded
-aggregate state payloads at 64 MiB.
+1,000,000 each, and cap conservatively estimated retained aggregation memory
+(group and state overhead, keys, distinct keys, aggregate payloads, and
+materialized output rows) at 64 MiB. This is an application-level estimate,
+not a hard cap on process RSS.
 Readers return explicit errors when a limit is exceeded, honor cancellation,
 propagate provider errors, and close the upstream cursor.
 
