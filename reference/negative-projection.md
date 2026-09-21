@@ -72,6 +72,13 @@ A defensive query may exclude `password`, `password_hash`, `secret`, and
 accidental exposure in a result, but it is not a security boundary. Callers must
 continue to rely on authorization and sensitive-data policy for enforcement.
 
+For structured SQLite reads, DALgo2SQL inspects the source's column names through
+SQLite schema metadata and normally selects only retained columns. If the source has
+ambiguous duplicate column names, or every column is excluded with no explicit
+column after the wildcard, it falls back to result filtering. The legacy SQL
+path also filters after fetching. Callers must not assume that an excluded value
+never reaches the SQL driver.
+
 The representation is intentionally structural: a wildcard projection is not
 expanded into an ordinary explicit column list, and the source plus requested
 exclusions remain available to planners and executors.
